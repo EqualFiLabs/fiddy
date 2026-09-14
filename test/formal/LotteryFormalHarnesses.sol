@@ -232,6 +232,9 @@ contract LotterySettlementHarness is FormalFacetHost {
         uint16 operatorBps,
         uint96 finalizerTip
     ) external returns (SettlementObservation memory result) {
+        paymentToken.mint(address(this), gross);
+        isolatedToken.mint(address(this), 17);
+
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
@@ -257,8 +260,6 @@ contract LotterySettlementHarness is FormalFacetHost {
             LibLotteryStorage.accountingStorage();
         accountingStorage.assetAccounting[address(paymentToken)].activeRoundEscrow = gross;
         accountingStorage.assetAccounting[address(isolatedToken)].treasuryAvailable = 17;
-        paymentToken.mint(address(this), gross);
-        isolatedToken.mint(address(this), 17);
 
         _delegate(address(facet), abi.encodeWithSelector(ISettlement.settleRound.selector, 1, ""));
 
@@ -286,6 +287,8 @@ contract LotteryClaimsHarness is FormalFacetHost {
         uint96 amount,
         address receiver
     ) external returns (ClaimObservation memory result) {
+        token.mint(address(this), amount);
+
         Round storage round = LibLotteryStorage.gameStorage().rounds[1];
         round.config.paymentToken = address(token);
         round.status = RoundStatus.Settled;
@@ -294,7 +297,6 @@ contract LotteryClaimsHarness is FormalFacetHost {
         AssetAccounting storage accounting =
             LibLotteryStorage.accountingStorage().assetAccounting[address(token)];
         accounting.winnerLiability = amount;
-        token.mint(address(this), amount);
 
         result.firstAmount = abi.decode(
             _delegate(
@@ -317,6 +319,8 @@ contract LotteryClaimsHarness is FormalFacetHost {
         uint96 amount,
         address receiver
     ) external returns (ClaimObservation memory result) {
+        token.mint(address(this), amount);
+
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         Round storage round = gs.rounds[2];
         round.config.paymentToken = address(token);
@@ -325,7 +329,6 @@ contract LotteryClaimsHarness is FormalFacetHost {
         AssetAccounting storage accounting =
             LibLotteryStorage.accountingStorage().assetAccounting[address(token)];
         accounting.refundLiability = amount;
-        token.mint(address(this), amount);
 
         result.firstAmount = abi.decode(
             _delegate(
@@ -356,6 +359,9 @@ contract LotteryRevenueHarness is FormalFacetHost {
         uint96 amount,
         uint96 isolatedAmount
     ) external returns (RevenueObservation memory result) {
+        paymentToken.mint(address(this), amount);
+        isolatedToken.mint(address(this), isolatedAmount);
+
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
@@ -369,8 +375,6 @@ contract LotteryRevenueHarness is FormalFacetHost {
         accountingStorage.pendingOperatorRevenue[1][address(isolatedToken)] = isolatedAmount;
         accountingStorage.assetAccounting[address(isolatedToken)].pendingOperatorRevenueTotal =
         isolatedAmount;
-        paymentToken.mint(address(this), amount);
-        isolatedToken.mint(address(this), isolatedAmount);
 
         result.succeeded = _tryDelegate(
             address(facet),
