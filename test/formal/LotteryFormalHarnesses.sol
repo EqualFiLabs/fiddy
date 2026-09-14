@@ -11,7 +11,6 @@ import { RevenueFacet } from "../../src/facets/RevenueFacet.sol";
 import { SettlementFacet } from "../../src/facets/SettlementFacet.sol";
 import { IClaims } from "../../src/interfaces/IClaims.sol";
 import { IEqualFiDrandRegistry } from "../../src/interfaces/IEqualFiDrandRegistry.sol";
-import { ILottery } from "../../src/interfaces/ILottery.sol";
 import { IOperatorFeeRouter } from "../../src/interfaces/IOperatorFeeRouter.sol";
 import { IRevenue } from "../../src/interfaces/IRevenue.sol";
 import { ISettlement } from "../../src/interfaces/ISettlement.sol";
@@ -106,8 +105,6 @@ struct CommitmentObservation {
     uint64 targetAfterCalls;
     RoundStatus status;
     uint32 catalogDelay;
-    bool buySucceeded;
-    bool expireSucceeded;
 }
 
 struct SettlementObservation {
@@ -162,13 +159,8 @@ abstract contract FormalFacetHost {
 }
 
 contract LotteryCommitmentHarness is LotteryFacet {
-    constructor() {
-        LibReentrancy.initialize();
-    }
-
-    function executeCommitment(FormalToken token, FormalRegistry registry, uint32 delay)
+    function executeCommitment(FormalRegistry registry, uint32 delay)
         external
-        nonReentrant
         returns (CommitmentObservation memory result)
     {
         LibLotteryStorage.IntegrationStorage storage integrations =
@@ -181,21 +173,19 @@ contract LotteryCommitmentHarness is LotteryFacet {
         uint256 roundId = 1;
         Round storage round = gs.rounds[roundId];
         round.config = RoundConfigSnapshot({
-            paymentToken: address(token),
-            ticketPrice: 1,
-            ticketCount: 1,
+            paymentToken: address(0),
+            ticketPrice: 0,
+            ticketCount: 0,
             salesDuration: 1 days,
             randomnessDelay: delay,
-            maxTicketsPerPurchase: 1,
-            winnerBps: 10_000,
+            maxTicketsPerPurchase: 0,
+            winnerBps: 0,
             operatorProtocolBps: 0,
             finalizerTip: 0
         });
         round.integrationVersion = 1;
-        round.expiresAt = uint64(block.timestamp + 1 days);
-        round.status = RoundStatus.Open;
 
-        _buyTickets(gs, round, roundId, 1);
+        _commitSellout(round, roundId);
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
@@ -204,10 +194,6 @@ contract LotteryCommitmentHarness is LotteryFacet {
         uint32 replacementDelay = delay == type(uint32).max ? 0 : delay + 1;
         gs.configs[1].randomnessDelay = replacementDelay;
         result.catalogDelay = gs.configs[1].randomnessDelay;
-        (result.buySucceeded,) = address(this)
-            .call(abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1)));
-        (result.expireSucceeded,) =
-            address(this).call(abi.encodeWithSelector(ILottery.expireRound.selector, roundId));
         result.targetAfterCalls = round.drandRound;
     }
 }

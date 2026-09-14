@@ -83,17 +83,9 @@ contract LotteryFacet is ILottery {
     }
 
     function buyTickets(uint256 roundId, uint32 ticketQuantity) external nonReentrant {
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        _buyTickets(gs, gs.rounds[roundId], roundId, ticketQuantity);
-    }
-
-    function _buyTickets(
-        LibLotteryStorage.GameStorage storage gs,
-        Round storage round,
-        uint256 roundId,
-        uint32 ticketQuantity
-    ) internal {
         _enforceParticipationActive();
+        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
+        Round storage round = gs.rounds[roundId];
         if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
         if (round.status != RoundStatus.Open) revert Errors.RoundNotOpen(roundId);
         if (block.timestamp >= round.expiresAt) revert Errors.RoundExpired(roundId);
@@ -149,7 +141,7 @@ contract LotteryFacet is ILottery {
         if (endExclusive == round.config.ticketCount) _commitSellout(round, roundId);
     }
 
-    function _commitSellout(Round storage round, uint256 roundId) private {
+    function _commitSellout(Round storage round, uint256 roundId) internal {
         round.status = RoundStatus.SoldOut;
         round.selloutAt = block.timestamp.toUint64();
 

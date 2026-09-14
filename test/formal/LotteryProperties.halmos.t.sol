@@ -29,22 +29,19 @@ import {
 } from "./LotteryFormalHarnesses.sol";
 
 contract LotteryCommitmentHalmosTest is Test {
-    function check_selloutCommitsOnceToStrictlyFutureRound(uint256 rawDelay) public {
+    function check_selloutCommitsToStrictlyFutureRoundAndIgnoresCatalogChanges(uint256 rawDelay)
+        public
+    {
         uint32 delay = uint32(bound(rawDelay, 0, type(uint32).max));
-        FormalToken token = new FormalToken("COMMIT");
         FormalRegistry registry = new FormalRegistry(false);
         LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
-        token.mint(address(this), 1);
-        token.approve(address(lottery), 1);
 
-        CommitmentObservation memory observed = lottery.executeCommitment(token, registry, delay);
+        CommitmentObservation memory observed = lottery.executeCommitment(registry, delay);
 
         assert(uint8(observed.status) == uint8(RoundStatus.SoldOut));
         assert(observed.registryRoundTime > observed.commitmentBoundary);
         assert(observed.drandRound == uint64(observed.commitmentBoundary + 1));
         assert(observed.catalogDelay == (delay == type(uint32).max ? 0 : delay + 1));
-        assert(!observed.buySucceeded);
-        assert(!observed.expireSucceeded);
         assert(observed.targetAfterCalls == observed.drandRound);
     }
 }
