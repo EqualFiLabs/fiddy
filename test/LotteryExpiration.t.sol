@@ -59,7 +59,10 @@ contract LotteryExpirationTest is LotteryIntegrationSetup {
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotExpired.selector, openRoundId));
         lottery.expireRound(openRoundId);
 
-        uint256 soldOutRoundId = _sellOutRoundA();
+        vm.prank(alice);
+        uint256 soldOutRoundId = lottery.openRound(2, 1);
+        vm.prank(bob);
+        lottery.buyTickets(soldOutRoundId, 4);
         vm.warp(stateView.round(soldOutRoundId).expiresAt);
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, soldOutRoundId));
         lottery.expireRound(soldOutRoundId);
