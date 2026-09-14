@@ -95,14 +95,25 @@ contract SettlementFacet is ISettlement {
         view
         returns (SettlementAmounts memory amounts)
     {
-        uint256 gross = round.receipts;
-        amounts.winner = Math.mulDiv(gross, round.config.winnerBps, BPS_DENOMINATOR);
+        return _allocateValues(
+            round.receipts,
+            round.config.winnerBps,
+            round.config.operatorProtocolBps,
+            round.config.finalizerTip
+        );
+    }
+
+    function _allocateValues(
+        uint256 gross,
+        uint16 winnerBps,
+        uint16 operatorProtocolBps,
+        uint96 finalizerTip
+    ) internal pure returns (SettlementAmounts memory amounts) {
+        amounts.winner = Math.mulDiv(gross, winnerBps, BPS_DENOMINATOR);
         uint256 protocolAmount = gross - amounts.winner;
-        amounts.operator =
-            Math.mulDiv(protocolAmount, round.config.operatorProtocolBps, BPS_DENOMINATOR);
+        amounts.operator = Math.mulDiv(protocolAmount, operatorProtocolBps, BPS_DENOMINATOR);
         uint256 treasuryGross = protocolAmount - amounts.operator;
-        amounts.finalizer =
-            round.config.finalizerTip < treasuryGross ? round.config.finalizerTip : treasuryGross;
+        amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
         amounts.treasury = treasuryGross - amounts.finalizer;
     }
 
@@ -113,7 +124,7 @@ contract SettlementFacet is ISettlement {
         address winner,
         bytes32 applicationSeed,
         SettlementAmounts memory amounts
-    ) private {
+    ) internal {
         round.status = RoundStatus.Settled;
         round.settledAt = block.timestamp.toUint64();
         round.winningTicket = winningTicket;

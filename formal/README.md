@@ -31,12 +31,13 @@ integration and stateful invariants cover those paths. The Registry summary does
 Quicknet arithmetic or cryptography; those belong to the separate `EqualFiDrandRegistry` proof
 package.
 
-The settlement rule calls the production `SettlementFacet` for one sold-out, one-ticket Round. It
-covers every nonzero `uint96` gross amount, every valid Winner and Operator BPS value, and every
-`uint96` Finalizer Tip. The Registry is summarized as an already-cached beacon posted after
-Sellout. The harness starts the payment token and one unrelated token exactly solvent, then proves
-revenue conservation, payment-token solvency, aggregate/versioned Operator equality, and no
-mutation of the unrelated token's custody or accounting.
+The settlement rule calls the shared production allocation and accounting implementations for one
+bounded Round. It covers every nonzero `uint96` gross amount, every valid Winner and Operator BPS
+value, and every `uint96` Finalizer Tip. The harness starts the payment token and one unrelated
+token exactly solvent, then proves revenue conservation, payment-token solvency,
+aggregate/versioned Operator equality, and no mutation of the unrelated token's custody or
+accounting. It does not prove Registry acquisition, ticket-owner lookup, or the external
+`settleRound` state gate; concrete integration tests cover those paths.
 
 The claim rules call the production `ClaimsFacet` for every nonzero `uint96` winner or refund
 amount using an exact-transfer ERC-20. They prove one successful delivery clears the matching

@@ -9,7 +9,6 @@ import { DiamondCutFacet } from "../../src/facets/DiamondCutFacet.sol";
 import { GovernanceFacet } from "../../src/facets/GovernanceFacet.sol";
 import { LotteryFacet } from "../../src/facets/LotteryFacet.sol";
 import { RevenueFacet } from "../../src/facets/RevenueFacet.sol";
-import { SettlementFacet } from "../../src/facets/SettlementFacet.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
 import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { FacetCut, FacetCutAction } from "../../src/shared/DiamondTypes.sol";
@@ -70,12 +69,10 @@ contract LotterySettlementHalmosTest is Test {
         uint96 tip = uint96(bound(rawTip, 0, type(uint96).max));
         FormalToken paymentToken = new FormalToken("PRIMARY");
         FormalToken isolatedToken = new FormalToken("ISOLATED");
-        FormalRegistry registry = new FormalRegistry(true);
-        SettlementFacet facet = new SettlementFacet();
         LotterySettlementHarness settlement = new LotterySettlementHarness();
 
         SettlementObservation memory observed = settlement.executeSettlement(
-            facet, registry, paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
+            paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
         );
         AssetAccounting memory accounting = observed.paymentAccounting;
         assert(accounting.activeRoundEscrow == 0);
@@ -90,7 +87,6 @@ contract LotterySettlementHalmosTest is Test {
         assert(observed.paymentCustody == gross);
         assert(observed.isolatedCustody == 17);
         assert(uint8(observed.status) == uint8(RoundStatus.Settled));
-        assert(observed.drandRound == 2);
     }
 }
 

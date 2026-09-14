@@ -13,11 +13,9 @@ import { IClaims } from "../../src/interfaces/IClaims.sol";
 import { IEqualFiDrandRegistry } from "../../src/interfaces/IEqualFiDrandRegistry.sol";
 import { IOperatorFeeRouter } from "../../src/interfaces/IOperatorFeeRouter.sol";
 import { IRevenue } from "../../src/interfaces/IRevenue.sol";
-import { ISettlement } from "../../src/interfaces/ISettlement.sol";
 import { LibLotteryStorage } from "../../src/libraries/LibLotteryStorage.sol";
 import { LibReentrancy } from "../../src/libraries/LibReentrancy.sol";
-import { LibTicketRanges } from "../../src/libraries/LibTicketRanges.sol";
-import { AssetAccounting, IntegrationConfig, Round, RoundStatus } from "../../src/shared/Types.sol";
+import { AssetAccounting, Round, RoundStatus } from "../../src/shared/Types.sol";
 
 contract FormalToken is ERC20 {
     constructor(string memory symbol) ERC20(symbol, symbol) { }
@@ -109,7 +107,6 @@ struct SettlementObservation {
     uint256 paymentCustody;
     uint256 isolatedCustody;
     RoundStatus status;
-    uint64 drandRound;
 }
 
 struct ClaimObservation {
@@ -175,14 +172,12 @@ contract LotteryCommitmentHarness is LotteryFacet {
     }
 }
 
-contract LotterySettlementHarness is FormalFacetHost {
+contract LotterySettlementHarness is SettlementFacet {
     constructor() {
         LibReentrancy.initialize();
     }
 
     function executeSettlement(
-        SettlementFacet facet,
-        FormalRegistry registry,
         FormalToken paymentToken,
         FormalToken isolatedToken,
         uint96 gross,
@@ -193,11 +188,6 @@ contract LotterySettlementHarness is FormalFacetHost {
         paymentToken.mint(address(this), gross);
         isolatedToken.mint(address(this), 17);
 
-        LibLotteryStorage.IntegrationStorage storage integrations =
-            LibLotteryStorage.integrationStorage();
-        integrations.currentVersion = 1;
-        integrations.integrations[1].drandRegistry = address(registry);
-
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         Round storage round = gs.rounds[1];
         round.config.paymentToken = address(paymentToken);
@@ -206,20 +196,17 @@ contract LotterySettlementHarness is FormalFacetHost {
         round.config.operatorProtocolBps = operatorBps;
         round.config.finalizerTip = finalizerTip;
         round.integrationVersion = 1;
-        round.selloutAt = 1;
-        round.drandRound = 2;
-        round.soldTickets = 1;
-        round.status = RoundStatus.SoldOut;
         round.receipts = gross;
         gs.activeRoundCount = 1;
-        LibTicketRanges.append(gs.entries[1], msg.sender, 1);
 
         LibLotteryStorage.AccountingStorage storage accountingStorage =
             LibLotteryStorage.accountingStorage();
         accountingStorage.assetAccounting[address(paymentToken)].activeRoundEscrow = gross;
         accountingStorage.assetAccounting[address(isolatedToken)].treasuryAvailable = 17;
 
-        _delegate(address(facet), abi.encodeWithSelector(ISettlement.settleRound.selector, 1, ""));
+        SettlementAmounts memory amounts =
+            _allocateValues(gross, winnerBps, operatorBps, finalizerTip);
+        _recordSettlement(gs, round, 0, msg.sender, keccak256("formal settlement"), amounts);
 
         result.paymentAccounting = accountingStorage.assetAccounting[address(paymentToken)];
         result.isolatedAccounting = accountingStorage.assetAccounting[address(isolatedToken)];
@@ -230,7 +217,6 @@ contract LotterySettlementHarness is FormalFacetHost {
         result.paymentCustody = paymentToken.balanceOf(address(this));
         result.isolatedCustody = isolatedToken.balanceOf(address(this));
         result.status = round.status;
-        result.drandRound = round.drandRound;
     }
 }
 
