@@ -95,7 +95,7 @@ contract SettlementFacet is ISettlement {
         returns (SettlementAmounts memory amounts)
     {
         return _allocateValues(
-            round.receipts,
+            round.receipts.toUint128(),
             round.config.winnerBps,
             round.config.operatorProtocolBps,
             round.config.finalizerTip
@@ -103,21 +103,22 @@ contract SettlementFacet is ISettlement {
     }
 
     function _allocateValues(
-        uint256 gross,
+        uint128 gross,
         uint16 winnerBps,
         uint16 operatorProtocolBps,
         uint96 finalizerTip
     ) internal pure returns (SettlementAmounts memory amounts) {
-        // Reachable receipts are bounded by uint96 ticket price * uint32 ticket count.
-        // Narrowing records that invariant and keeps the following BPS products below uint256.
-        uint128 boundedGross = gross.toUint128();
-        amounts.winner = uint256(boundedGross) * winnerBps / BPS_DENOMINATOR;
-        uint256 protocolAmount = gross - amounts.winner;
-        uint128 boundedProtocolAmount = protocolAmount.toUint128();
-        amounts.operator = uint256(boundedProtocolAmount) * operatorProtocolBps / BPS_DENOMINATOR;
-        uint256 treasuryGross = protocolAmount - amounts.operator;
-        amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
-        amounts.treasury = treasuryGross - amounts.finalizer;
+        // Reachable receipts are bounded by uint96 ticket price * uint32 ticket count. Config
+        // validation also caps both BPS values at the denominator. Under those invariants every
+        // multiplication and subtraction below is safe; the live caller checks the gross cast.
+        unchecked {
+            amounts.winner = uint256(gross) * winnerBps / BPS_DENOMINATOR;
+            uint256 protocolAmount = uint256(gross) - amounts.winner;
+            amounts.operator = protocolAmount * operatorProtocolBps / BPS_DENOMINATOR;
+            uint256 treasuryGross = protocolAmount - amounts.operator;
+            amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
+            amounts.treasury = treasuryGross - amounts.finalizer;
+        }
     }
 
     function _recordSettlement(
