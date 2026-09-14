@@ -24,11 +24,14 @@ library Errors {
     error NotAuthority(address caller);
     error NotGuardian(address caller);
     error ProtocolPaused();
+    error RandomnessPredatesSellout(uint64 drandRound, uint64 postedAt, uint64 selloutAt);
+    error RandomnessUnavailable(uint64 drandRound);
     error Reentrancy();
     error RoundExpired(uint256 roundId);
     error RoundNotExpired(uint256 roundId);
     error RoundNotFound(uint256 roundId);
     error RoundNotOpen(uint256 roundId);
+    error RoundNotSoldOut(uint256 roundId);
     error SelectorAlreadyExists(bytes4 selector);
     error SelectorDoesNotExist(bytes4 selector);
     error SelectorUnchanged(bytes4 selector);
