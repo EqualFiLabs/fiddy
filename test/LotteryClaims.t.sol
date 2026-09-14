@@ -231,6 +231,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
 
     function _createTokenConfig(address paymentToken) private returns (uint64 version) {
         LotteryConfig memory config = _config(paymentToken, 10, 10, 10, 1 days, 0);
+        router.setAsset(paymentToken, true, true);
         vm.startPrank(authority);
         version = governance.createLotteryConfig(config);
         governance.setLotteryConfigEnabled(version, true);
