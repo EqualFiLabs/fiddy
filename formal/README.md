@@ -18,15 +18,15 @@ bounded-loop warning. A compiled harness is not a proof result.
 
 ## Model bounds
 
-The commitment rule starts from a reachable open one-ticket Round snapshot, then internally calls
-the inherited, reentrancy-guarded production `LotteryFacet.buyTickets` implementation for its final
-purchase with one exact-transfer ERC-20, every `uint32` randomness delay, and a deterministic
-Registry summary whose first future round is exactly `timestamp + 1`. It proves the stored target
-is strictly future and unchanged by later catalog mutation or repeated purchase/expiry calls. The
-synthetic precondition initializes only fields read by this transition; it does not prove
-`openRound`, unrelated lifecycle fields, or Diamond dispatch. Those paths have separate Foundry
-integration coverage. The Registry summary does not prove Quicknet arithmetic or cryptography;
-those belong to the separate `EqualFiDrandRegistry` proof package.
+The commitment rule starts from a reachable open one-ticket Round snapshot, then calls the shared
+production purchase implementation under the same reentrancy guard as
+`LotteryFacet.buyTickets`. It uses one exact-transfer ERC-20, every `uint32` randomness delay, and
+a deterministic Registry summary whose first future round is exactly `timestamp + 1`. It proves
+the stored target is strictly future and unchanged by later catalog mutation or repeated
+purchase/expiry calls. The synthetic precondition initializes only fields read by this transition;
+it does not prove `openRound`, unrelated lifecycle fields, or Diamond dispatch. Those paths have
+separate Foundry integration coverage. The Registry summary does not prove Quicknet arithmetic or
+cryptography; those belong to the separate `EqualFiDrandRegistry` proof package.
 
 The settlement rule calls the production `SettlementFacet` for one sold-out, one-ticket Round. It
 covers every nonzero `uint96` gross amount, every valid Winner and Operator BPS value, and every

@@ -82,10 +82,18 @@ contract LotteryFacet is ILottery {
         _recordPurchase(gs, round, roundId, ticketQuantity);
     }
 
-    function buyTickets(uint256 roundId, uint32 ticketQuantity) public nonReentrant {
-        _enforceParticipationActive();
+    function buyTickets(uint256 roundId, uint32 ticketQuantity) external nonReentrant {
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        Round storage round = gs.rounds[roundId];
+        _buyTickets(gs, gs.rounds[roundId], roundId, ticketQuantity);
+    }
+
+    function _buyTickets(
+        LibLotteryStorage.GameStorage storage gs,
+        Round storage round,
+        uint256 roundId,
+        uint32 ticketQuantity
+    ) internal {
+        _enforceParticipationActive();
         if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
         if (round.status != RoundStatus.Open) revert Errors.RoundNotOpen(roundId);
         if (block.timestamp >= round.expiresAt) revert Errors.RoundExpired(roundId);

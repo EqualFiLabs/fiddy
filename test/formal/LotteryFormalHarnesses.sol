@@ -168,6 +168,7 @@ contract LotteryCommitmentHarness is LotteryFacet {
 
     function executeCommitment(FormalToken token, FormalRegistry registry, uint32 delay)
         external
+        nonReentrant
         returns (CommitmentObservation memory result)
     {
         LibLotteryStorage.IntegrationStorage storage integrations =
@@ -194,7 +195,7 @@ contract LotteryCommitmentHarness is LotteryFacet {
         round.expiresAt = uint64(block.timestamp + 1 days);
         round.status = RoundStatus.Open;
 
-        buyTickets(roundId, 1);
+        _buyTickets(gs, round, roundId, 1);
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
