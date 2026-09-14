@@ -161,17 +161,14 @@ abstract contract FormalFacetHost {
     }
 }
 
-contract LotteryCommitmentHarness is FormalFacetHost {
+contract LotteryCommitmentHarness is LotteryFacet {
     constructor() {
         LibReentrancy.initialize();
     }
 
-    function executeCommitment(
-        LotteryFacet facet,
-        FormalToken token,
-        FormalRegistry registry,
-        uint32 delay
-    ) external returns (CommitmentObservation memory result) {
+    function seedCommitmentPrecondition(FormalToken token, FormalRegistry registry, uint32 delay)
+        external
+    {
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
@@ -205,24 +202,28 @@ contract LotteryCommitmentHarness is FormalFacetHost {
         round.openedAt = uint64(block.timestamp);
         round.expiresAt = uint64(block.timestamp + 1 days);
         round.status = RoundStatus.Open;
+    }
 
-        _delegate(
-            address(facet), abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1))
-        );
+    function observeCommitment(FormalRegistry registry)
+        external
+        returns (CommitmentObservation memory result)
+    {
+        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
+        uint256 roundId = 1;
+        Round storage round = gs.rounds[roundId];
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
-        result.commitmentBoundary = uint256(round.selloutAt) + delay;
+        result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
         result.status = round.status;
 
+        uint32 delay = round.config.randomnessDelay;
         uint32 replacementDelay = delay == type(uint32).max ? 0 : delay + 1;
         gs.configs[1].randomnessDelay = replacementDelay;
         result.catalogDelay = gs.configs[1].randomnessDelay;
-        result.buySucceeded = _tryDelegate(
-            address(facet), abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1))
-        );
-        result.expireSucceeded = _tryDelegate(
-            address(facet), abi.encodeWithSelector(ILottery.expireRound.selector, roundId)
-        );
+        (result.buySucceeded,) = address(this)
+            .call(abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1)));
+        (result.expireSucceeded,) =
+            address(this).call(abi.encodeWithSelector(ILottery.expireRound.selector, roundId));
         result.targetAfterCalls = round.drandRound;
     }
 }

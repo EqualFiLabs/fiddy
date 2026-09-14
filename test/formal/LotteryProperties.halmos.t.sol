@@ -33,13 +33,13 @@ contract LotteryCommitmentHalmosTest is Test {
         uint32 delay = uint32(bound(rawDelay, 0, type(uint32).max));
         FormalToken token = new FormalToken("COMMIT");
         FormalRegistry registry = new FormalRegistry(false);
-        LotteryFacet facet = new LotteryFacet();
         LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
         token.mint(address(this), 1);
         token.approve(address(lottery), 1);
 
-        CommitmentObservation memory observed =
-            lottery.executeCommitment(facet, token, registry, delay);
+        lottery.seedCommitmentPrecondition(token, registry, delay);
+        lottery.buyTickets(1, 1);
+        CommitmentObservation memory observed = lottery.observeCommitment(registry);
 
         assert(uint8(observed.status) == uint8(RoundStatus.SoldOut));
         assert(observed.registryRoundTime > observed.commitmentBoundary);
