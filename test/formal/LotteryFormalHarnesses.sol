@@ -21,8 +21,8 @@ import { LibTicketRanges } from "../../src/libraries/LibTicketRanges.sol";
 import {
     AssetAccounting,
     IntegrationConfig,
-    LotteryConfig,
     Round,
+    RoundConfigSnapshot,
     RoundStatus
 } from "../../src/shared/Types.sol";
 
@@ -172,35 +172,25 @@ contract LotteryCommitmentHarness is LotteryFacet {
     {
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
-        integrations.currentVersion = 1;
         integrations.integrations[1] = IntegrationConfig(address(registry), address(0));
 
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        gs.nextConfigVersion = 1;
-        gs.nextRoundId = 1;
-        gs.maxActiveRounds = 1;
-        gs.activeRoundCount = 1;
-        LotteryConfig storage config = gs.configs[1];
-        config.paymentToken = address(token);
-        config.ticketPrice = 1;
-        config.ticketCount = 1;
-        config.salesDuration = 1 days;
-        config.randomnessDelay = delay;
-        config.maxTicketsPerPurchase = 1;
-        config.winnerBps = 10_000;
+        gs.configs[1].randomnessDelay = delay;
 
         uint256 roundId = 1;
         Round storage round = gs.rounds[roundId];
-        round.config.paymentToken = address(token);
-        round.config.ticketPrice = 1;
-        round.config.ticketCount = 1;
-        round.config.salesDuration = 1 days;
-        round.config.randomnessDelay = delay;
-        round.config.maxTicketsPerPurchase = 1;
-        round.config.winnerBps = 10_000;
-        round.configVersion = 1;
+        round.config = RoundConfigSnapshot({
+            paymentToken: address(token),
+            ticketPrice: 1,
+            ticketCount: 1,
+            salesDuration: 1 days,
+            randomnessDelay: delay,
+            maxTicketsPerPurchase: 1,
+            winnerBps: 10_000,
+            operatorProtocolBps: 0,
+            finalizerTip: 0
+        });
         round.integrationVersion = 1;
-        round.openedAt = uint64(block.timestamp);
         round.expiresAt = uint64(block.timestamp + 1 days);
         round.status = RoundStatus.Open;
 
