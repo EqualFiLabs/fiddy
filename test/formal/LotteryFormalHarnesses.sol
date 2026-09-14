@@ -170,35 +170,45 @@ contract LotteryCommitmentHarness is FormalFacetHost {
         LotteryFacet facet,
         FormalToken token,
         FormalRegistry registry,
-        FormalRouter router,
         uint32 delay
     ) external returns (CommitmentObservation memory result) {
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        gs.nextConfigVersion = 1;
-        gs.maxActiveRounds = 1;
-        gs.configs[1] = LotteryConfig({
-            paymentToken: address(token),
-            ticketPrice: 1,
-            ticketCount: 1,
-            salesDuration: 1 days,
-            randomnessDelay: delay,
-            maxTicketsPerPurchase: 1,
-            winnerBps: 10_000,
-            operatorProtocolBps: 0,
-            finalizerTip: 0
-        });
-
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
-        integrations.integrations[1] = IntegrationConfig(address(registry), address(router));
-        gs.configEnabled[1] = true;
+        integrations.integrations[1] = IntegrationConfig(address(registry), address(0));
 
-        uint256 roundId = abi.decode(
-            _delegate(address(facet), abi.encodeWithSelector(ILottery.openRound.selector, 1, 1)),
-            (uint256)
-        );
+        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
+        gs.nextConfigVersion = 1;
+        gs.nextRoundId = 1;
+        gs.maxActiveRounds = 1;
+        gs.activeRoundCount = 1;
+        LotteryConfig storage config = gs.configs[1];
+        config.paymentToken = address(token);
+        config.ticketPrice = 1;
+        config.ticketCount = 1;
+        config.salesDuration = 1 days;
+        config.randomnessDelay = delay;
+        config.maxTicketsPerPurchase = 1;
+        config.winnerBps = 10_000;
+
+        uint256 roundId = 1;
         Round storage round = gs.rounds[roundId];
+        round.config.paymentToken = address(token);
+        round.config.ticketPrice = 1;
+        round.config.ticketCount = 1;
+        round.config.salesDuration = 1 days;
+        round.config.randomnessDelay = delay;
+        round.config.maxTicketsPerPurchase = 1;
+        round.config.winnerBps = 10_000;
+        round.configVersion = 1;
+        round.integrationVersion = 1;
+        round.openedAt = uint64(block.timestamp);
+        round.expiresAt = uint64(block.timestamp + 1 days);
+        round.status = RoundStatus.Open;
+
+        _delegate(
+            address(facet), abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1))
+        );
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + delay;
