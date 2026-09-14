@@ -5,11 +5,13 @@ library Errors {
     error AlreadyFinalized();
     error AlreadyInitialized();
     error ActiveRoundLimitReached();
+    error AuthorityMismatch(address expected, address actual);
     error CutsDisabled();
     error ConfigNotFound(uint64 version);
     error ConfigDisabled(uint64 version);
     error ConfigAlreadyActive(uint64 version, uint256 roundId);
     error EmptyInitializationData();
+    error EmptyLotteryConfigurations();
     error EmptySelectors();
     error FunctionNotFound(bytes4 selector);
     error InitializationFailed(bytes reason);
