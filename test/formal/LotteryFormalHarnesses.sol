@@ -176,7 +176,6 @@ contract LotteryCommitmentHarness is FormalFacetHost {
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         gs.nextConfigVersion = 1;
         gs.maxActiveRounds = 1;
-        gs.configEnabled[1] = true;
         gs.configs[1] = LotteryConfig({
             paymentToken: address(token),
             ticketPrice: 1,
@@ -193,6 +192,7 @@ contract LotteryCommitmentHarness is FormalFacetHost {
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
         integrations.integrations[1] = IntegrationConfig(address(registry), address(router));
+        gs.configEnabled[1] = true;
 
         uint256 roundId = abi.decode(
             _delegate(address(facet), abi.encodeWithSelector(ILottery.openRound.selector, 1, 1)),
