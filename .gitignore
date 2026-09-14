@@ -5,3 +5,5 @@
 /.env.*
 !.env.example
 *.swp
+/formal/results/**/*.log
+/formal/results/**/*.exit
