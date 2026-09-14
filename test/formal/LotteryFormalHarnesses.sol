@@ -166,9 +166,13 @@ contract LotteryCommitmentHarness is LotteryFacet {
         LibReentrancy.initialize();
     }
 
-    function seedCommitmentPrecondition(FormalToken token, FormalRegistry registry, uint32 delay)
+    function executeCommitment(FormalToken token, FormalRegistry registry, uint32 delay)
         external
+        returns (CommitmentObservation memory result)
     {
+        token.mint(address(this), 1);
+        token.approve(address(this), 1);
+
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
@@ -202,21 +206,13 @@ contract LotteryCommitmentHarness is LotteryFacet {
         round.openedAt = uint64(block.timestamp);
         round.expiresAt = uint64(block.timestamp + 1 days);
         round.status = RoundStatus.Open;
-    }
 
-    function observeCommitment(FormalRegistry registry)
-        external
-        returns (CommitmentObservation memory result)
-    {
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        uint256 roundId = 1;
-        Round storage round = gs.rounds[roundId];
+        this.buyTickets(roundId, 1);
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
         result.status = round.status;
 
-        uint32 delay = round.config.randomnessDelay;
         uint32 replacementDelay = delay == type(uint32).max ? 0 : delay + 1;
         gs.configs[1].randomnessDelay = replacementDelay;
         result.catalogDelay = gs.configs[1].randomnessDelay;
