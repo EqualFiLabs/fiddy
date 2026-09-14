@@ -34,6 +34,8 @@ contract LotteryCommitmentHalmosTest is Test {
         FormalToken token = new FormalToken("COMMIT");
         FormalRegistry registry = new FormalRegistry(false);
         LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
+        token.mint(address(this), 1);
+        token.approve(address(lottery), 1);
 
         CommitmentObservation memory observed = lottery.executeCommitment(token, registry, delay);
 

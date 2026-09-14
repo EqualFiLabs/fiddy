@@ -170,9 +170,6 @@ contract LotteryCommitmentHarness is LotteryFacet {
         external
         returns (CommitmentObservation memory result)
     {
-        token.mint(address(this), 1);
-        token.approve(address(this), 1);
-
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
@@ -207,7 +204,7 @@ contract LotteryCommitmentHarness is LotteryFacet {
         round.expiresAt = uint64(block.timestamp + 1 days);
         round.status = RoundStatus.Open;
 
-        this.buyTickets(roundId, 1);
+        buyTickets(roundId, 1);
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
