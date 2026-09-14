@@ -4,51 +4,51 @@ pragma solidity 0.8.30;
 import { Test } from "forge-std/Test.sol";
 
 import { StaticsLotteryDiamond } from "../../src/StaticsLotteryDiamond.sol";
+import { ClaimsFacet } from "../../src/facets/ClaimsFacet.sol";
 import { DiamondCutFacet } from "../../src/facets/DiamondCutFacet.sol";
 import { GovernanceFacet } from "../../src/facets/GovernanceFacet.sol";
+import { LotteryFacet } from "../../src/facets/LotteryFacet.sol";
+import { RevenueFacet } from "../../src/facets/RevenueFacet.sol";
+import { SettlementFacet } from "../../src/facets/SettlementFacet.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
 import { IGovernance } from "../../src/interfaces/IGovernance.sol";
-import { ILottery } from "../../src/interfaces/ILottery.sol";
-import { IRevenue } from "../../src/interfaces/IRevenue.sol";
 import { FacetCut, FacetCutAction } from "../../src/shared/DiamondTypes.sol";
-import { AssetAccounting, Round, RoundStatus } from "../../src/shared/Types.sol";
+import { AssetAccounting, RoundStatus } from "../../src/shared/Types.sol";
 import {
+    ClaimObservation,
+    CommitmentObservation,
     FormalRegistry,
     FormalRouter,
     FormalToken,
     LotteryClaimsHarness,
     LotteryCommitmentHarness,
     LotteryRevenueHarness,
-    LotterySettlementHarness
+    LotterySettlementHarness,
+    RevenueObservation,
+    SettlementObservation
 } from "./LotteryFormalHarnesses.sol";
 
 contract LotteryCommitmentHalmosTest is Test {
     function check_selloutCommitsOnceToStrictlyFutureRound(uint256 rawDelay) public {
         uint32 delay = uint32(bound(rawDelay, 0, type(uint32).max));
         FormalToken token = new FormalToken("COMMIT");
-        FormalRegistry registry = new FormalRegistry();
-        FormalRouter router = new FormalRouter();
-        LotteryCommitmentHarness lottery =
-            new LotteryCommitmentHarness(token, registry, router, delay);
+        FormalRegistry registry = new FormalRegistry(false);
+        FormalRouter router = new FormalRouter(false);
+        LotteryFacet facet = new LotteryFacet();
+        LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
         token.mint(address(this), 1);
         token.approve(address(lottery), 1);
 
-        uint256 roundId = lottery.openRound(1, 1);
-        Round memory committed = lottery.roundState(roundId);
-        uint256 boundary = uint256(committed.selloutAt) + delay;
-        assert(uint8(committed.status) == uint8(RoundStatus.SoldOut));
-        assert(registry.roundTime(committed.drandRound) > boundary);
-        assert(committed.drandRound == uint64(boundary + 1));
+        CommitmentObservation memory observed =
+            lottery.executeCommitment(facet, token, registry, router, delay);
 
-        uint32 replacementDelay = delay == type(uint32).max ? 0 : delay + 1;
-        lottery.setRandomnessDelay(replacementDelay);
-        (bool buySucceeded,) = address(lottery)
-            .call(abi.encodeWithSelector(ILottery.buyTickets.selector, roundId, uint32(1)));
-        (bool expireSucceeded,) =
-            address(lottery).call(abi.encodeWithSelector(ILottery.expireRound.selector, roundId));
-        assert(!buySucceeded);
-        assert(!expireSucceeded);
-        assert(lottery.roundState(roundId).drandRound == committed.drandRound);
+        assert(uint8(observed.status) == uint8(RoundStatus.SoldOut));
+        assert(observed.registryRoundTime > observed.commitmentBoundary);
+        assert(observed.drandRound == uint64(observed.commitmentBoundary + 1));
+        assert(observed.catalogDelay == (delay == type(uint32).max ? 0 : delay + 1));
+        assert(!observed.buySucceeded);
+        assert(!observed.expireSucceeded);
+        assert(observed.targetAfterCalls == observed.drandRound);
     }
 }
 
@@ -65,35 +65,27 @@ contract LotterySettlementHalmosTest is Test {
         uint96 tip = uint96(bound(rawTip, 0, type(uint96).max));
         FormalToken paymentToken = new FormalToken("PRIMARY");
         FormalToken isolatedToken = new FormalToken("ISOLATED");
-        FormalRegistry registry = new FormalRegistry();
-        LotterySettlementHarness settlement = new LotterySettlementHarness(
-            registry, paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
+        FormalRegistry registry = new FormalRegistry(true);
+        SettlementFacet facet = new SettlementFacet();
+        LotterySettlementHarness settlement = new LotterySettlementHarness();
+
+        SettlementObservation memory observed = settlement.executeSettlement(
+            facet, registry, paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
         );
-        registry.cache(2, keccak256("formal randomness"), 2);
-
-        settlement.settleRound(1, "");
-
-        AssetAccounting memory accounting = settlement.accounting(address(paymentToken));
+        AssetAccounting memory accounting = observed.paymentAccounting;
         assert(accounting.activeRoundEscrow == 0);
         assert(accounting.refundLiability == 0);
         assert(
             accounting.winnerLiability + accounting.pendingOperatorRevenueTotal
                     + accounting.treasuryAvailable + accounting.finalizerLiability == gross
         );
-        assert(
-            settlement.pendingOperator(address(paymentToken))
-                == accounting.pendingOperatorRevenueTotal
-        );
-        assert(
-            settlement.finalizerCredit(address(paymentToken), address(this))
-                == accounting.finalizerLiability
-        );
-        assert(settlement.accounting(address(isolatedToken)).treasuryAvailable == 17);
-        assert(paymentToken.balanceOf(address(settlement)) == gross);
-        assert(isolatedToken.balanceOf(address(settlement)) == 17);
-        Round memory settledRound = settlement.roundState();
-        assert(uint8(settledRound.status) == uint8(RoundStatus.Settled));
-        assert(settledRound.drandRound == 2);
+        assert(observed.versionedOperator == accounting.pendingOperatorRevenueTotal);
+        assert(observed.finalizerCredit == accounting.finalizerLiability);
+        assert(observed.isolatedAccounting.treasuryAvailable == 17);
+        assert(observed.paymentCustody == gross);
+        assert(observed.isolatedCustody == 17);
+        assert(uint8(observed.status) == uint8(RoundStatus.Settled));
+        assert(observed.drandRound == 2);
     }
 }
 
@@ -103,31 +95,32 @@ contract LotteryClaimsHalmosTest is Test {
     function check_winnerClaimCannotRepeat(uint256 rawAmount) public {
         uint96 amount = uint96(bound(rawAmount, 1, type(uint96).max));
         FormalToken token = new FormalToken("WINNER");
-        LotteryClaimsHarness claims = new LotteryClaimsHarness(token, address(this), amount, false);
+        ClaimsFacet facet = new ClaimsFacet();
+        LotteryClaimsHarness claims = new LotteryClaimsHarness();
 
-        assert(claims.claimWinner(1, RECEIVER) == amount);
-        (bool repeated,) = address(claims)
-            .call(abi.encodeWithSelector(claims.claimWinner.selector, uint256(1), RECEIVER));
-        assert(!repeated);
-        assert(claims.winnerClaimable() == 0);
-        assert(claims.accounting(address(token)).winnerLiability == 0);
-        assert(token.balanceOf(RECEIVER) == amount);
-        assert(token.balanceOf(address(claims)) == 0);
+        ClaimObservation memory observed = claims.executeWinnerClaim(facet, token, amount, RECEIVER);
+
+        _assertClaimCleared(observed, amount);
     }
 
     function check_refundClaimCannotRepeat(uint256 rawAmount) public {
         uint96 amount = uint96(bound(rawAmount, 1, type(uint96).max));
         FormalToken token = new FormalToken("REFUND");
-        LotteryClaimsHarness claims = new LotteryClaimsHarness(token, address(this), amount, true);
+        ClaimsFacet facet = new ClaimsFacet();
+        LotteryClaimsHarness claims = new LotteryClaimsHarness();
 
-        assert(claims.claimRefund(2, RECEIVER) == amount);
-        (bool repeated,) = address(claims)
-            .call(abi.encodeWithSelector(claims.claimRefund.selector, uint256(2), RECEIVER));
-        assert(!repeated);
-        assert(claims.refundCredit(address(this)) == 0);
-        assert(claims.accounting(address(token)).refundLiability == 0);
-        assert(token.balanceOf(RECEIVER) == amount);
-        assert(token.balanceOf(address(claims)) == 0);
+        ClaimObservation memory observed = claims.executeRefundClaim(facet, token, amount, RECEIVER);
+
+        _assertClaimCleared(observed, amount);
+    }
+
+    function _assertClaimCleared(ClaimObservation memory observed, uint96 amount) private pure {
+        assert(observed.firstAmount == amount);
+        assert(!observed.repeatedSucceeded);
+        assert(observed.remainingClaim == 0);
+        assert(observed.aggregateLiability == 0);
+        assert(observed.receiverBalance == amount);
+        assert(observed.custodyBalance == 0);
     }
 }
 
@@ -141,41 +134,31 @@ contract LotteryRevenueHalmosTest is Test {
         uint96 isolatedAmount = uint96(bound(rawIsolatedAmount, 1, type(uint64).max));
         FormalToken paymentToken = new FormalToken("REVENUE");
         FormalToken isolatedToken = new FormalToken("OTHER");
-        FormalRouter router = new FormalRouter();
-        LotteryRevenueHarness revenue = new LotteryRevenueHarness(
-            router, paymentToken, isolatedToken, amount, isolatedAmount
-        );
-        router.setRejectContribution(rejectContribution);
+        FormalRouter router = new FormalRouter(rejectContribution);
+        RevenueFacet facet = new RevenueFacet();
+        LotteryRevenueHarness revenue = new LotteryRevenueHarness();
 
-        (bool succeeded,) = address(revenue)
-            .call(
-                abi.encodeWithSelector(
-                    IRevenue.flushOperatorRevenue.selector,
-                    uint64(1),
-                    address(paymentToken),
-                    uint256(amount)
-                )
-            );
+        RevenueObservation memory observed = revenue.executeOperatorFlush(
+            facet, router, paymentToken, isolatedToken, amount, isolatedAmount
+        );
 
         if (rejectContribution) {
-            assert(!succeeded);
-            assert(revenue.pendingOperator(address(paymentToken)) == amount);
-            assert(revenue.accounting(address(paymentToken)).pendingOperatorRevenueTotal == amount);
-            assert(paymentToken.balanceOf(address(revenue)) == amount);
-            assert(paymentToken.balanceOf(address(router)) == 0);
+            assert(!observed.succeeded);
+            assert(observed.paymentPending == amount);
+            assert(observed.paymentAggregate == amount);
+            assert(observed.paymentCustody == amount);
+            assert(observed.routerCustody == 0);
         } else {
-            assert(succeeded);
-            assert(revenue.pendingOperator(address(paymentToken)) == 0);
-            assert(revenue.accounting(address(paymentToken)).pendingOperatorRevenueTotal == 0);
-            assert(paymentToken.balanceOf(address(revenue)) == 0);
-            assert(paymentToken.balanceOf(address(router)) == amount);
+            assert(observed.succeeded);
+            assert(observed.paymentPending == 0);
+            assert(observed.paymentAggregate == 0);
+            assert(observed.paymentCustody == 0);
+            assert(observed.routerCustody == amount);
         }
-        assert(paymentToken.allowance(address(revenue), address(router)) == 0);
-        assert(revenue.pendingOperator(address(isolatedToken)) == isolatedAmount);
-        assert(
-            revenue.accounting(address(isolatedToken)).pendingOperatorRevenueTotal == isolatedAmount
-        );
-        assert(isolatedToken.balanceOf(address(revenue)) == isolatedAmount);
+        assert(observed.allowance == 0);
+        assert(observed.isolatedPending == isolatedAmount);
+        assert(observed.isolatedAggregate == isolatedAmount);
+        assert(observed.isolatedCustody == isolatedAmount);
     }
 }
 
