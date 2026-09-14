@@ -9,7 +9,11 @@ operator tooling. Do not install, probe, or invoke Halmos on an ordinary develop
 - `check_selloutCommitmentIsStrictlyFuture`
 - `check_selloutCommitmentMatchesRegistrySelection`
 - `check_selloutCommitmentIgnoresCatalogChanges`
-- `check_settlementConservesRevenueAndIsolatesTokens`
+- `check_settlementConservesRevenue`
+- `check_settlementPreservesPaymentTokenSolvency`
+- `check_settlementRecordsOperatorAndFinalizerLiabilities`
+- `check_settlementDoesNotMutateIsolatedToken`
+- `check_settlementRecordsTerminalStatus`
 - `check_winnerClaimCannotRepeat`
 - `check_refundClaimCannotRepeat`
 - `check_operatorFlushIsAtomicAndTokenIsolated`
@@ -32,8 +36,8 @@ Quicknet arithmetic or cryptography; those belong to the separate `EqualFiDrandR
 package.
 
 The settlement rule calls the shared production allocation and accounting implementations for one
-bounded Round. It covers every nonzero `uint96` gross amount, every valid Winner and Operator BPS
-value, and every `uint96` Finalizer Tip. The harness starts the payment token and one unrelated
+bounded Round. It covers every nonzero `uint64` gross amount, every valid Winner and Operator BPS
+value, and every `uint64` Finalizer Tip. The harness starts the payment token and one unrelated
 token exactly solvent, then proves revenue conservation, payment-token solvency,
 aggregate/versioned Operator equality, and no mutation of the unrelated token's custody or
 accounting. It does not prove Registry acquisition, ticket-owner lookup, or the external

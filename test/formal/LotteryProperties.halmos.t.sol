@@ -57,36 +57,87 @@ contract LotteryCommitmentHalmosTest is Test {
 }
 
 contract LotterySettlementHalmosTest is Test {
-    function check_settlementConservesRevenueAndIsolatesTokens(
+    function check_settlementConservesRevenue(
         uint256 rawGross,
         uint256 rawWinnerBps,
         uint256 rawOperatorBps,
         uint256 rawTip
     ) public {
-        uint96 gross = uint96(bound(rawGross, 1, type(uint96).max));
-        uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
-        uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
-        uint96 tip = uint96(bound(rawTip, 0, type(uint96).max));
-        FormalToken paymentToken = new FormalToken("PRIMARY");
-        FormalToken isolatedToken = new FormalToken("ISOLATED");
-        LotterySettlementHarness settlement = new LotterySettlementHarness();
-
-        SettlementObservation memory observed = settlement.executeSettlement(
-            paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
-        );
+        (uint64 gross, SettlementObservation memory observed) =
+            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
         AssetAccounting memory accounting = observed.paymentAccounting;
-        assert(accounting.activeRoundEscrow == 0);
-        assert(accounting.refundLiability == 0);
         assert(
             accounting.winnerLiability + accounting.pendingOperatorRevenueTotal
                     + accounting.treasuryAvailable + accounting.finalizerLiability == gross
         );
+    }
+
+    function check_settlementPreservesPaymentTokenSolvency(
+        uint256 rawGross,
+        uint256 rawWinnerBps,
+        uint256 rawOperatorBps,
+        uint256 rawTip
+    ) public {
+        (uint64 gross, SettlementObservation memory observed) =
+            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
+        AssetAccounting memory accounting = observed.paymentAccounting;
+        assert(accounting.activeRoundEscrow == 0);
+        assert(accounting.refundLiability == 0);
+        assert(observed.paymentCustody == gross);
+    }
+
+    function check_settlementRecordsOperatorAndFinalizerLiabilities(
+        uint256 rawGross,
+        uint256 rawWinnerBps,
+        uint256 rawOperatorBps,
+        uint256 rawTip
+    ) public {
+        (, SettlementObservation memory observed) =
+            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
+        AssetAccounting memory accounting = observed.paymentAccounting;
         assert(observed.versionedOperator == accounting.pendingOperatorRevenueTotal);
         assert(observed.finalizerCredit == accounting.finalizerLiability);
+    }
+
+    function check_settlementDoesNotMutateIsolatedToken(
+        uint256 rawGross,
+        uint256 rawWinnerBps,
+        uint256 rawOperatorBps,
+        uint256 rawTip
+    ) public {
+        (, SettlementObservation memory observed) =
+            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
         assert(observed.isolatedAccounting.treasuryAvailable == 17);
-        assert(observed.paymentCustody == gross);
         assert(observed.isolatedCustody == 17);
+    }
+
+    function check_settlementRecordsTerminalStatus(
+        uint256 rawGross,
+        uint256 rawWinnerBps,
+        uint256 rawOperatorBps,
+        uint256 rawTip
+    ) public {
+        (, SettlementObservation memory observed) =
+            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
         assert(uint8(observed.status) == uint8(RoundStatus.Settled));
+    }
+
+    function _executeSettlement(
+        uint256 rawGross,
+        uint256 rawWinnerBps,
+        uint256 rawOperatorBps,
+        uint256 rawTip
+    ) private returns (uint64 gross, SettlementObservation memory observed) {
+        gross = uint64(bound(rawGross, 1, type(uint64).max));
+        uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
+        uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
+        uint64 tip = uint64(bound(rawTip, 0, type(uint64).max));
+        FormalToken paymentToken = new FormalToken("PRIMARY");
+        FormalToken isolatedToken = new FormalToken("ISOLATED");
+        LotterySettlementHarness settlement = new LotterySettlementHarness();
+        observed = settlement.executeSettlement(
+            paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
+        );
     }
 }
 
