@@ -5,11 +5,13 @@ import { Test } from "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import { StaticsLotteryDiamond } from "../../src/StaticsLotteryDiamond.sol";
+import { ClaimsFacet } from "../../src/facets/ClaimsFacet.sol";
 import { DiamondCutFacet } from "../../src/facets/DiamondCutFacet.sol";
 import { GovernanceFacet } from "../../src/facets/GovernanceFacet.sol";
 import { LotteryFacet } from "../../src/facets/LotteryFacet.sol";
 import { SettlementFacet } from "../../src/facets/SettlementFacet.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
+import { IClaims } from "../../src/interfaces/IClaims.sol";
 import { IEqualFiDrandRegistry } from "../../src/interfaces/IEqualFiDrandRegistry.sol";
 import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { ILottery } from "../../src/interfaces/ILottery.sol";
@@ -164,6 +166,7 @@ abstract contract LotteryIntegrationSetup is Test {
     IGovernance internal governance;
     ILottery internal lottery;
     ISettlement internal settlement;
+    IClaims internal claims;
     IntegrationStateFacet internal stateView;
     IntegrationToken internal tokenA;
     IntegrationToken internal tokenB;
@@ -177,14 +180,16 @@ abstract contract LotteryIntegrationSetup is Test {
         GovernanceFacet governanceFacet = new GovernanceFacet();
         LotteryFacet lotteryFacet = new LotteryFacet();
         SettlementFacet settlementFacet = new SettlementFacet();
+        ClaimsFacet claimsFacet = new ClaimsFacet();
         IntegrationStateFacet viewFacet = new IntegrationStateFacet();
         IntegrationInitializer initializer = new IntegrationInitializer();
 
-        FacetCut[] memory cuts = new FacetCut[](4);
+        FacetCut[] memory cuts = new FacetCut[](5);
         cuts[0] = _cut(address(governanceFacet), _governanceSelectors());
         cuts[1] = _cut(address(lotteryFacet), _lotterySelectors());
         cuts[2] = _cut(address(settlementFacet), _settlementSelectors());
-        cuts[3] = _cut(address(viewFacet), _stateSelectors());
+        cuts[3] = _cut(address(claimsFacet), _claimsSelectors());
+        cuts[4] = _cut(address(viewFacet), _stateSelectors());
         vm.prank(authority);
         IDiamondCut(address(diamond))
             .diamondCut(
@@ -194,6 +199,7 @@ abstract contract LotteryIntegrationSetup is Test {
         governance = IGovernance(address(diamond));
         lottery = ILottery(address(diamond));
         settlement = ISettlement(address(diamond));
+        claims = IClaims(address(diamond));
         stateView = IntegrationStateFacet(address(diamond));
         tokenA = new IntegrationToken("Payment A", "PAYA");
         tokenB = new IntegrationToken("Payment B", "PAYB");
@@ -292,6 +298,13 @@ abstract contract LotteryIntegrationSetup is Test {
     function _settlementSelectors() internal pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
         selectors[0] = ISettlement.settleRound.selector;
+    }
+
+    function _claimsSelectors() internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](3);
+        selectors[0] = IClaims.claimWinner.selector;
+        selectors[1] = IClaims.claimRefund.selector;
+        selectors[2] = IClaims.claimFinalizerTips.selector;
     }
 
     function _stateSelectors() internal pure returns (bytes4[] memory selectors) {
