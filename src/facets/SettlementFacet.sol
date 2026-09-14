@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.30;
 
-import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { IEqualFiDrandRegistry } from "../interfaces/IEqualFiDrandRegistry.sol";
@@ -109,9 +108,13 @@ contract SettlementFacet is ISettlement {
         uint16 operatorProtocolBps,
         uint96 finalizerTip
     ) internal pure returns (SettlementAmounts memory amounts) {
-        amounts.winner = Math.mulDiv(gross, winnerBps, BPS_DENOMINATOR);
+        // Reachable receipts are bounded by uint96 ticket price * uint32 ticket count.
+        // Narrowing records that invariant and keeps the following BPS products below uint256.
+        uint128 boundedGross = gross.toUint128();
+        amounts.winner = uint256(boundedGross) * winnerBps / BPS_DENOMINATOR;
         uint256 protocolAmount = gross - amounts.winner;
-        amounts.operator = Math.mulDiv(protocolAmount, operatorProtocolBps, BPS_DENOMINATOR);
+        uint128 boundedProtocolAmount = protocolAmount.toUint128();
+        amounts.operator = uint256(boundedProtocolAmount) * operatorProtocolBps / BPS_DENOMINATOR;
         uint256 treasuryGross = protocolAmount - amounts.operator;
         amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
         amounts.treasury = treasuryGross - amounts.finalizer;
