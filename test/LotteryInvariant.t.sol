@@ -171,6 +171,7 @@ contract LotteryStateHandler is Test {
         if (lotteryView.activeRoundCount() >= lotteryView.maxActiveRounds()) return;
 
         uint64 version = uint64(bound(rawConfig, 1, 2));
+        if (lotteryView.activeRoundForConfig(version) != 0) return;
         (LotteryConfig memory config, bool enabled) = lotteryView.lotteryConfig(version);
         if (!enabled) return;
         uint32 limit =

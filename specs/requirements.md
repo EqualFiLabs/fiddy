@@ -156,6 +156,7 @@ A Round state from which ticket purchases can never resume, including settlement
 5. THE Lottery SHALL NOT permit opening a Round that violates the configured concurrency policy.
 6. THE Lottery SHALL permit concurrent active Rounds to use different enabled Round Configuration Versions and different Payment Tokens.
 7. Disabling a Round Configuration Version SHALL prevent new Rounds from opening from that version but SHALL NOT alter or pause a Round already opened from it.
+8. A Round Configuration Version SHALL have at most one non-terminal Round at a time, so capacity occupied by that version always represents a Round that additional participants can join.
 
 ### Requirement 5: Governance-Approved ERC-20 Ticket Purchases
 
@@ -379,6 +380,7 @@ A Round state from which ticket purchases can never resume, including settlement
 9. Accounting for one Payment Token SHALL NOT consume, offset, or rely upon custody of another token.
 10. Direct unsolicited ERC-20 transfers or forced native ETH SHALL NOT silently create lottery tickets, winner claims, or Operator entitlement.
 11. THE Lottery SHALL maintain a deterministic per-token policy for provable surplus that cannot consume recorded liabilities.
+12. THE Lottery SHALL classify ERC-20 surplus only through a canonical Payment Token address previously admitted by governance, and governance validation SHALL reject multiple token addresses that control the same underlying balance ledger.
 
 ### Requirement 20: Reentrancy and Failed-Transfer Safety
 

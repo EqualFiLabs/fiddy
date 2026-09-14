@@ -8,6 +8,7 @@ library Errors {
     error CutsDisabled();
     error ConfigNotFound(uint64 version);
     error ConfigDisabled(uint64 version);
+    error ConfigAlreadyActive(uint64 version, uint256 roundId);
     error EmptyInitializationData();
     error EmptySelectors();
     error FunctionNotFound(bytes4 selector);
@@ -42,6 +43,7 @@ library Errors {
     error SelectorDoesNotExist(bytes4 selector);
     error SelectorUnchanged(bytes4 selector);
     error StaleRandomnessRound(uint64 drandRound);
+    error SurplusAssetNotAdmitted(address asset);
     error TicketLimitExceeded();
     error IntegrationNotConfigured();
     error IntegrationNotFound(uint64 version);

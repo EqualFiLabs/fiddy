@@ -322,6 +322,20 @@ contract LotteryPurchasesTest is Test {
         lottery.openRound(2, 1);
     }
 
+    function test_OneOpenRoundPerConfigurationKeepsCapacityJoinable() public {
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(1, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.ConfigAlreadyActive.selector, 1, roundId));
+        vm.prank(bob);
+        lottery.openRound(1, 1);
+
+        vm.prank(bob);
+        lottery.buyTickets(roundId, 1);
+        assertEq(stateView.activeRoundCount(), 1);
+        assertEq(stateView.roundState(roundId).soldTickets, 2);
+    }
+
     function test_ExpirationReclassifiesOnlyRoundTokenPrincipal() public {
         vm.prank(alice);
         uint256 roundA = lottery.openRound(1, 2);

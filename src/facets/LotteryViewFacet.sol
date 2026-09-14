@@ -104,6 +104,10 @@ contract LotteryViewFacet is ILotteryView {
         return LibLotteryStorage.gameStorage().maxActiveRounds;
     }
 
+    function activeRoundForConfig(uint64 configVersion) external view returns (uint256 roundId) {
+        return LibLotteryStorage.gameStorage().activeRoundForConfig[configVersion];
+    }
+
     function pendingOperatorRevenue(uint64 integrationVersion, address asset)
         external
         view

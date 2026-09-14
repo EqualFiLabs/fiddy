@@ -24,6 +24,7 @@ contract GovernanceFacet is IGovernance {
 
         version = ++gs.nextConfigVersion;
         gs.configs[version] = config;
+        LibLotteryStorage.accountingStorage().admittedPaymentToken[config.paymentToken] = true;
         emit LotteryConfigCreated(version, config.paymentToken, config);
     }
 

@@ -135,6 +135,7 @@ contract SettlementFacet is ISettlement {
         round.winner = winner;
         round.applicationSeed = applicationSeed;
         round.winnerClaimable = amounts.winner;
+        gs.activeRoundForConfig[round.configVersion] = 0;
         --gs.activeRoundCount;
 
         address paymentToken = round.config.paymentToken;

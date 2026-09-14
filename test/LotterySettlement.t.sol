@@ -233,8 +233,14 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
     }
 
     function test_DomainSeparatesRoundsUsingSameRegistryRandomness() public {
+        vm.startPrank(authority);
+        governance.createLotteryConfig(_config(address(tokenA), 10, 10, 10, 1 days, 30));
+        governance.setLotteryConfigEnabled(3, true);
+        vm.stopPrank();
+
         uint256 firstRoundId = _sellOutRoundA();
-        uint256 secondRoundId = _sellOutRoundA();
+        vm.prank(alice);
+        uint256 secondRoundId = lottery.openRound(3, 10);
         Round memory first = stateView.round(firstRoundId);
         Round memory second = stateView.round(secondRoundId);
         assertEq(first.drandRound, second.drandRound);

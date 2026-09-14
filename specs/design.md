@@ -368,6 +368,7 @@ validate not paused
 validate concurrency
 load caller-selected LotteryConfig version
 validate configuration exists and is enabled
+validate the configuration has no existing non-terminal Round
 load current IntegrationConfig
 validate purchase quantity
 pull and validate the exact Payment Token amount
@@ -375,14 +376,18 @@ create Round
 snapshot configs/versions
 record first cumulative ticket range
 record buyer refund basis
-increment activeRoundCount
+record activeRoundForConfig and increment activeRoundCount
 emit RoundOpened
 emit TicketsPurchased
 if immediately sold out:
     commit Quicknet round
 ```
 
-This prevents an account from occupying active-Round capacity without putting funds at risk.
+Each Configuration Version has at most one non-terminal Round. A caller can start a configuration's
+Round permissionlessly with the first purchase, while later participants join that same Round
+through `buyTickets`. An account therefore cannot fill multiple global slots with duplicate
+one-ticket Rounds under one low-demand configuration. Governance should keep the global limit at
+least as large as the intended concurrently enabled configuration set.
 
 `openRound` and `buyTickets` use the Diamond-wide reentrancy guard because the configured Payment Token is an external contract.
 
@@ -425,6 +430,7 @@ Effects:
 
 ```text
 status = Expired
+activeRoundForConfig[round.configVersion] = 0
 activeRoundCount -= 1
 assetAccounting[round.config.paymentToken].activeRoundEscrow -= round.receipts
 assetAccounting[round.config.paymentToken].refundLiability += round.receipts
@@ -538,6 +544,7 @@ Round.winningTicket = winningTicket
 Round.winner = winner
 Round.applicationSeed = seed
 Round.winnerClaimable = winnerAmount
+activeRoundForConfig[round.configVersion] = 0
 activeRoundCount -= 1
 AssetAccounting storage accounting = assetAccounting[round.config.paymentToken]
 accounting.activeRoundEscrow -= gross
@@ -752,6 +759,13 @@ function absorbTokenSurplus(address asset)
     returns (uint256 amount);
 ```
 
+The `asset` must be a canonical Payment Token address previously admitted through an immutable
+Round Configuration Version. Arbitrary token addresses are rejected before their balances are
+queried. This prevents an unapproved ERC-20 facade over a configured token's shared ledger from
+classifying live custody under an empty accounting key. Because contracts cannot generically
+detect two approved facades that share one ledger, governance and deployment validation must also
+reject multiple canonical addresses for the same underlying balance state.
+
 Because the Lottery records no native-ETH liabilities, forced ETH may be forwarded permissionlessly only to `treasuryRecipient` through a separate `flushNativeSurplus()` path. Native ETH can never be absorbed into ERC-20 accounting or used to buy tickets.
 
 No participant or Operator liability can be consumed.
@@ -784,6 +798,7 @@ function currentIntegration() external view returns (IntegrationConfig memory, u
 function integrationAt(uint64 version) external view returns (IntegrationConfig memory);
 function activeRoundCount() external view returns (uint256);
 function maxActiveRounds() external view returns (uint16);
+function activeRoundForConfig(uint64 configVersion) external view returns (uint256 roundId);
 function pendingOperatorRevenue(uint64 integrationVersion, address asset) external view returns (uint256);
 function assetAccounting(address asset) external view returns (AssetAccounting memory);
 function finalizerCredit(address asset, address account) external view returns (uint256);
@@ -1072,6 +1087,7 @@ struct GameStorage {
     mapping(uint256 => Round) rounds;
     mapping(uint256 => TicketRange[]) entries;
     mapping(uint256 roundId => mapping(address user => uint256 amount)) refundCredit;
+    mapping(uint64 configVersion => uint256 roundId) activeRoundForConfig;
 }
 ```
 
@@ -1150,7 +1166,12 @@ operatorProtocolBps <= 10_000
 maxTicketsPerPurchase == 0 || maxTicketsPerPurchase <= ticketCount
 ```
 
-Governance approval is limited to standard exact-transfer, non-rebasing ERC-20 tokens. The Lottery enforces exact sender-spend and receiver-receipt deltas on every inbound and outbound transfer, but governance and deployment validation must also exclude tokens whose rebases, upgrade authority, pause, blocklist, or mutable fee behavior could later undermine outstanding liabilities.
+Governance approval is limited to standard exact-transfer, non-rebasing ERC-20 tokens with one
+canonical contract address for their underlying balance ledger. The Lottery enforces exact
+sender-spend and receiver-receipt deltas on every inbound and outbound transfer, but governance
+and deployment validation must also exclude multiple-address token facades and tokens whose
+rebases, upgrade authority, pause, blocklist, or mutable fee behavior could later undermine
+outstanding liabilities.
 
 The following are intentionally valid:
 

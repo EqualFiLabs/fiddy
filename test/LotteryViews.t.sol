@@ -19,6 +19,8 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         assertEq(stateView.latestRoundId(), 0);
         assertEq(stateView.activeRoundCount(), 0);
         assertEq(stateView.maxActiveRounds(), 2);
+        assertEq(stateView.activeRoundForConfig(1), 0);
+        assertEq(stateView.activeRoundForConfig(2), 0);
 
         (LotteryConfig memory first, bool firstEnabled) = stateView.lotteryConfig(1);
         (LotteryConfig memory second, bool secondEnabled) = stateView.lotteryConfig(2);
@@ -65,6 +67,7 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
 
         assertEq(stateView.latestRoundId(), roundId);
         assertEq(stateView.activeRoundCount(), 1);
+        assertEq(stateView.activeRoundForConfig(1), roundId);
 
         Round memory value = stateView.round(roundId);
         assertEq(uint8(value.status), uint8(RoundStatus.Open));
@@ -138,8 +141,10 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         Round memory expired = stateView.round(expiredRoundId);
         assertEq(uint8(settled.status), uint8(RoundStatus.Settled));
         assertEq(settled.winnerClaimable, 80);
+        assertEq(stateView.activeRoundForConfig(1), 0);
         assertEq(uint8(expired.status), uint8(RoundStatus.Expired));
         assertEq(stateView.refundableAmount(expiredRoundId, alice), 40);
+        assertEq(stateView.activeRoundForConfig(2), 0);
 
         AssetAccounting memory accountingA = stateView.assetAccounting(address(tokenA));
         assertEq(accountingA.activeRoundEscrow, 0);

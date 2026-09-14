@@ -158,7 +158,7 @@ All economic and operational configuration affects future Rounds only. Governanc
     - _Requirements: 5.7-5.9, 6.1-6.5_
   - [ ] 9.2 Implement first-purchase Round creation
     - New file: `src/facets/LotteryFacet.sol`
-    - Details: `openRound(configVersion, ticketQuantity)` creates a Round from a governance-enabled immutable configuration and performs its first ERC-20 purchase atomically; snapshot Payment Token, config/integration versions, and enforce global concurrency.
+    - Details: `openRound(configVersion, ticketQuantity)` creates a Round from a governance-enabled immutable configuration and performs its first ERC-20 purchase atomically; snapshot Payment Token and config/integration versions, enforce global concurrency, and allow at most one non-terminal Round per Configuration Version.
     - _Requirements: 3.1-3.6, 4.1-4.7, 5.1-5.11_
   - [ ] 9.3 Implement additional ticket purchases
     - Details: Pull the Round's Payment Token with `SafeERC20`; require buyer spent and Diamond received exactly `ticketPrice * quantity`; enforce ticket availability, status, expiry, and purchase limits; increment buyer refund credit on every purchase.
@@ -232,8 +232,8 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Permissionless per-token flush only to the governance-configured Treasury recipient, using exact-transfer validation.
     - _Requirements: 14.1-14.6, 19.8_
   - [ ] 13.6 Implement provable per-token surplus handling
-    - Details: For each ERC-20, surplus equals Diamond token balance minus that token's recorded liabilities and available Treasury revenue; allow explicit absorption into Treasury without touching any token's liabilities. Treat forced native ETH separately as non-Lottery Treasury surplus.
-    - _Requirements: 14.1-14.6, 19.9-19.11_
+    - Details: For each governance-admitted canonical Payment Token address, surplus equals Diamond token balance minus that token's recorded liabilities and available Treasury revenue; reject arbitrary token addresses, and allow explicit absorption into Treasury without touching any token's liabilities. Treat forced native ETH separately as non-Lottery Treasury surplus. Deployment validation must reject multiple ERC-20 addresses that control the same underlying balance ledger.
+    - _Requirements: 14.1-14.6, 19.9-19.12_
 
 - [ ] 14. Implement complete read/indexer surface
   - [ ] 14.1 Create `LotteryViewFacet`
@@ -257,7 +257,7 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Valid/invalid BPS, zero semantics, Payment Token validation, immutable configuration creation, enable/disable behavior, global limits, versioning, and historical snapshots.
     - _Requirements: 1-3_
   - [ ] 16.2 Add `test/LotteryPurchases.t.sol` and `test/TicketRanges.t.sol`
-    - Details: Exact ERC-20 transfers, insufficient allowance/balance, receiver-fee and sender-fee rejection, direct-donation resistance, overselling, purchase limits, ranges, binary search, boundaries, Sellout, and concurrent different-token Rounds.
+    - Details: Exact ERC-20 transfers, insufficient allowance/balance, receiver-fee and sender-fee rejection, direct-donation resistance, overselling, purchase limits, ranges, binary search, boundaries, Sellout, one active Round per configuration, and concurrent different-token Rounds.
     - _Requirements: 4-7, 19_
   - [ ] 16.3 Add `test/LotterySettlement.t.sol`
     - Details: Cached/uncached beacons, wrong/stale rounds, deterministic winner, split permutations, rounding, zero/100% shares, tip caps.
@@ -266,7 +266,7 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Include reverting, paused, blocked, fee-mutated, and inexact token transfers; invalid receivers; preserved liabilities; and double-claim attempts.
     - _Requirements: 12, 15, 18-20_
   - [ ] 16.5 Add `test/LotteryRevenue.t.sol`
-    - Details: Direct same-token Router contribution, exact allowance behavior, incomplete Router bootstrap, unregistered/disabled asset, zero effective weight, Router liability/index capacity rejection, Treasury transfers, per-token surplus, cross-token isolation, version preservation, and atomicity.
+    - Details: Direct same-token Router contribution, exact allowance behavior, incomplete Router bootstrap, unregistered/disabled asset, zero effective weight, Router liability/index capacity rejection, Treasury transfers, canonical-token surplus, shared-ledger alias rejection, rebasing/balance-drift boundaries, cross-token isolation, version preservation, and atomicity.
     - _Requirements: 13, 14, 19, 20, 22_
   - [ ] 16.6 Add `test/LotteryGovernance.t.sol` and `test/LotteryDiamond.t.sol`
     - Details: Timelock-only upgrades/config, guardian limitations, pause, facet changes, irreversible finalization.
