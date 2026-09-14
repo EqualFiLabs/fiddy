@@ -4,7 +4,7 @@
 
 Statics Lottery is a sellout-based, configurable ERC-20 lottery implemented as an EIP-2535 Diamond.
 
-Players purchase one or more non-transferable ticket positions using the governance-approved Payment Token selected by the Round's immutable configuration version. Multiple concurrent Rounds may use different tokens. Each Round snapshots the complete configuration in effect when the Round begins. When the final ticket sells, the Round permanently commits to a future drand Quicknet round. Once that beacon is available, anyone may settle the Round.
+Players purchase one or more non-transferable ticket positions using the governance-approved Payment Token selected by the Round's immutable configuration version. Multiple concurrent Rounds may use different tokens. Each Round snapshots the complete configuration in effect when the Round begins. When the final ticket sells, the Round permanently commits to the drand Quicknet round scheduled strictly after its L2 timestamp boundary and configured delay. Once that beacon is available, anyone may settle the Round.
 
 Settlement deterministically divides Round revenue among:
 
@@ -18,6 +18,14 @@ Randomness verification is delegated to a standalone shared `EqualFiDrandRegistr
 The Lottery does not contain BLS verification logic and does not distribute rewards across individual Operator NFTs.
 
 The Diamond remains upgradeable through timelocked governance during controlled launch. Governance may permanently and irreversibly disable Diamond cuts. Parameter governance remains separate from code upgradeability, meaning configured economic parameters may continue to be changed for future Rounds after the Diamond implementation itself becomes immutable.
+
+Robinhood Chain's operated sequencer and chain governance are part of the
+deployment trusted computing base. V1 assumes honest transaction ordering and
+honest progression of the L2 timestamp. The Lottery does not claim outcome
+fairness against a rogue sequencer that deliberately withholds or reorders the
+final purchase, or keeps L2 time stale until a favorable Quicknet beacon is
+known. Exercising that capability violates the accepted sequencer-honesty
+assumption and is outside the ordinary-participant threat model for V1.
 
 ### Existing EqualFi Patterns Reused
 
@@ -65,6 +73,7 @@ alongside reward-asset, bootstrap, and synchronized-weight status views. The Lot
 22. **Guardian powers are narrow:** A guardian may stop new participation but cannot stop settlement, expiration, claims, refunds, or already-earned revenue handling.
 23. **All accounting is isolated by token:** At rest, escrow and every liability remain in the Round's Payment Token. Failure of a token or Router call reverts the entire flush and preserves the same-token Operator liability in the Diamond.
 24. **Native ETH is deliberately unsupported:** One ERC-20 custody path avoids special-case purchasing, claiming, refund, and Router logic. Governance may enable WETH configurations whenever ETH-denominated participation is desired.
+25. **Robinhood sequencing is a chain trust assumption:** Under the deployed code, drand prevents public participants, relayers, finalizers, and ordinary configuration governance from supplying or replacing outcome entropy. V1 does not attempt to neutralize a malicious Robinhood sequencer's inherent transaction-ordering and timestamp influence, and pre-finalization Diamond upgrades remain a separate documented trust boundary.
 
 # Architecture
 
@@ -152,6 +161,15 @@ sequenceDiagram
     Lottery->>Lottery: resolve winning ticket
     Lottery->>Lottery: create liabilities
 ```
+
+The `sellout + delay` boundary is an L2 timestamp boundary. Under the accepted
+Robinhood-operated-sequencer honesty assumption, the target is not yet available
+when the final purchase is sequenced. `hasSig(target) == false` proves only that
+the Registry has not cached the target; it does not independently prove that a
+public drand signature is unknown offchain. Likewise, `postedAt > selloutAt`
+proves Registry ordering on L2, not wall-clock freshness against a sequencer
+deliberately holding L2 time stale. This limitation is an explicit chain trust
+boundary rather than a property of BLS verification.
 
 ## Operator Revenue Sequence
 
@@ -343,7 +361,7 @@ Responsibilities:
 - open a Round with its first purchase;
 - purchase additional tickets;
 - atomically detect Sellout;
-- commit the Round to its future Quicknet round;
+- commit the Round to the Quicknet round scheduled strictly after its L2 timestamp boundary;
 - permissionlessly expire unsold Rounds.
 
 ### Opening a Round
@@ -927,7 +945,7 @@ The Registry is the release-critical formal-verification boundary for randomness
 
 The formal package SHALL cover the compiled Registry EVM runtime bytecode and all contract-side logic that can affect that claim. This includes:
 
-- complete-domain Quicknet Round arithmetic, including strict-future minimality and overflow behavior
+- complete-domain Quicknet Round arithmetic, including strictly-after-boundary minimality and overflow behavior
 - exact `uint64` Round serialization, Quicknet DST selection, and compiled public-key binding
 - compressed G1 flag parsing and decompression, uncompressed G1 decoding, field bounds, infinity rejection, and representation normalization
 - hash-to-curve and EIP-2537 call wiring, including calldata construction, success handling, exact return-data validation, and rejection paths
@@ -945,6 +963,11 @@ The trusted computing base and explicit proof exclusions are:
 - authenticity of the pinned official Quicknet public key, DST, genesis time, and period
 - correctness of the pinned Solidity compiler and target-chain EVM semantics
 - drand threshold-operator honesty and network liveness
+
+This list scopes the Registry verification claim. The Lottery's application-level
+freshness claim separately assumes honest ordering and L2 timestamp progression
+by the Robinhood-operated sequencer, as described in the sellout commitment and
+Lottery proof boundaries.
 
 Official Quicknet intermediate and end-to-end vectors SHALL differentially test parsing, serialization, hash-to-curve inputs, point normalization, pairing results, and final randomness. Robinhood fork or testnet execution SHALL validate the concrete EIP-2537 behavior. These checks connect abstracted assumptions to the target runtime, but they are not substitutes for the formal proofs.
 
@@ -976,7 +999,7 @@ Semantics:
 - `ticketPrice > 0` and is denominated in the Payment Token's base units
 - `ticketCount > 0`
 - `salesDuration > 0`
-- `randomnessDelay` may be 0
+- `randomnessDelay` may be 0; target freshness relies on the documented honest-sequencer assumption rather than a chain-specific wall-clock safety floor
 - `maxTicketsPerPurchase == 0` means unlimited up to remaining tickets
 - `winnerBps` is 0 through 10,000
 - `operatorProtocolBps` is 0 through 10,000 and applies to Protocol Share, not gross revenue
@@ -1218,6 +1241,15 @@ registry.roundTime(target) > block.timestamp + round.config.randomnessDelay
 
 as a consistency check against the configured registry. Once written, `round.drandRound` has no ordinary mutation path.
 
+This construction proves that the target is scheduled strictly after the
+contract's L2 commitment boundary and that ordinary Lottery actors cannot
+replace it. It does not prove that the L2 timestamp tracked parent-chain wall
+clock against a malicious sequencer. A Robinhood sequencer capable of holding
+time stale and controlling final-purchase inclusion could wait for an uncached
+but publicly known Quicknet signature and bias target selection. V1 explicitly
+accepts sequencer honesty as part of the chain trust model instead of imposing a
+multi-day delay or adding a cross-chain commitment protocol.
+
 # Ticket Resolution
 
 Proposed library:
@@ -1406,7 +1438,7 @@ ERC-20 and `OperatorFeeRouter` failures are allowed to bubble so claims, refunds
 2. **Ticket Conservation:** Sum of purchased quantities equals `round.soldTickets`, and sold tickets never exceed `round.config.ticketCount`. Validates Requirements 5 and 6.
 3. **Exact Purchase Accounting:** Every successful purchase increases receipts exactly by the amount both spent by the buyer and received by the Lottery, equal to `ticketPrice * quantity`. Validates Requirements 5 and 19.
 4. **Sellout Finality:** Once status is `SoldOut`, `drandRound != 0` and never changes. Validates Requirements 7 and 16.
-5. **No Precommit Randomness:** At Sellout the target is not already cached and is scheduled strictly after `selloutAt + randomnessDelay`. Validates Requirements 7 and 8.
+5. **L2-Boundary Randomness Commitment:** At Sellout the target is not already cached and is scheduled strictly after `selloutAt + randomnessDelay`. Under the documented honest-sequencer assumption, it is not yet available when the final purchase is ordered. The property does not establish wall-clock freshness against a malicious sequencer. Validates Requirements 7 and 8.
 6. **Encoding-Invariant Beacon:** Equivalent valid 48-byte and 96-byte Quicknet signatures produce identical `randomnessOf(round)`. Validates Requirements 8 and 9.
 7. **Deterministic Winner:** Fixed registry randomness, chain ID, Diamond address, Round ID, ticket count, and ranges yield one deterministic winner. Validates Requirements 9 and 10.
 8. **Winning Ticket Is Sold:** Every settled Round has `winningTicket < ticketCount` and resolves to exactly one purchaser. Validates Requirements 6, 9 and 10.
@@ -1487,7 +1519,7 @@ deploy Lottery Diamond
 configure dependencies
 open Round
 purchase until Sellout
-observe committed future Quicknet round
+observe the committed Quicknet round scheduled after the L2 boundary
 retrieve actual drand Quicknet signature
 submit settlement
 verify onchain BLS12-381 proof
@@ -1505,7 +1537,7 @@ Required Registry targets:
 
 ```text
 roundTime and firstRoundAfter complete-domain correctness
-strict-future target minimality and overflow safety
+strictly-after-supplied-timestamp target minimality and overflow safety
 Quicknet key, DST, message, and Round binding
 malformed encoding, point, precompile-failure, and return-data rejection
 verification-success equivalence under constrained EIP-2537 summaries
@@ -1528,6 +1560,12 @@ terminal state monotonicity
 Operator flush atomicity
 Diamond cutsDisabled irreversibility
 ```
+
+The Lottery commitment proof treats the sellout timestamp and call order as EVM
+inputs. It proves strictly-after-boundary arithmetic relative to that L2 timestamp,
+single-assignment of the target, and absence of an ordinary replacement path. It
+does not prove honest wall-clock progression, fair transaction ordering, or
+resistance to a rogue Robinhood sequencer.
 
 # Requirement Traceability Summary
 

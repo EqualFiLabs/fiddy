@@ -25,15 +25,22 @@ bounded-loop warning. A compiled harness is not a proof result.
 ## Model bounds
 
 The commitment rule calls the shared production `_commitSelloutTarget` implementation with every
-`uint32` randomness delay and a deterministic Registry summary whose first future round is exactly
-`timestamp + 1`. The live `_commitSellout` path resolves its Registry and delay from the Round's
+`uint32` randomness delay and a deterministic Registry summary whose first round after the supplied
+timestamp is exactly `timestamp + 1`. The live `_commitSellout` path resolves its Registry and delay
+from the Round's
 snapshotted integration and configuration before calling this same helper. The rule proves the
-stored target is strictly future, uncached when selected, and unchanged by later mutation of the
-configuration catalog. It does not prove the preceding ticket purchase, integration-version
+stored target is strictly after the supplied L2 timestamp boundary, uncached when selected, and
+unchanged by later mutation of the configuration catalog. It does not prove the preceding ticket
+purchase, integration-version
 resolution, the one-way lifecycle gate around `_commitSellout`, or Diamond dispatch; Foundry
 integration and stateful invariants cover those paths. The Registry summary does not prove
 Quicknet arithmetic or cryptography; those belong to the separate `EqualFiDrandRegistry` proof
 package.
+
+The proof treats that timestamp and transaction order as EVM inputs. It does not prove wall-clock
+freshness, fair ordering, or resistance to a Robinhood sequencer deliberately holding L2 time
+stale. V1 accepts honest ordering and timestamp progression by the Robinhood-operated sequencer as
+a target-chain trust assumption.
 
 The settlement rules call the shared production allocation and accounting implementations for one
 bounded Round. The conservation rule isolates the pure allocation helper; the state-transition
@@ -68,6 +75,7 @@ above. Direct storage seeding establishes reachable preconditions only; each cla
 then calls production facet code.
 
 The package does not prove drand cryptography or network liveness, `OperatorFeeRouter` internal
-distribution, arbitrary ERC-20 behavior, governance honesty, compiler correctness, target-client
-correctness, or Robinhood runtime behavior. Foundry fuzz/invariant tests, the Registry proof
-package, integration tests, audit review, and Robinhood testnet validation are separate evidence.
+distribution, arbitrary ERC-20 behavior, governance honesty, sequencer ordering or timestamp
+honesty, compiler correctness, target-client correctness, or Robinhood runtime behavior. Foundry
+fuzz/invariant tests, the Registry proof package, integration tests, audit review, and Robinhood
+testnet validation are separate evidence.

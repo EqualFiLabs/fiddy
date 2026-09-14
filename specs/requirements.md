@@ -2,11 +2,19 @@
 
 ## Introduction
 
-Statics Lottery is a standalone, sellout-based onchain lottery that accepts a governance-approved ERC-20 payment token configured per Round, commits each sold-out round to future drand Quicknet randomness, and permits anyone to finalize the result once the committed beacon is available.
+Statics Lottery is a standalone, sellout-based onchain lottery that accepts a governance-approved ERC-20 payment token configured per Round, commits each sold-out round to a drand Quicknet round scheduled strictly after its L2 commitment boundary, and permits anyone to finalize the result once the committed beacon is available.
 
 Each Round distributes its payment-token revenue among the winning ticket holder, the Statics Treasury, and Statics Operators. Operator revenue is contributed directly to the standalone `OperatorFeeRouter` in the same ERC-20 token used to purchase that Round's tickets.
 
 The protocol is designed around permissionless operation and minimal administrative trust. All tunable economic and operational parameters are governance-configurable for future rounds, while each live round permanently snapshots the configuration under which users purchased tickets. Administrative changes SHALL NOT retroactively alter an existing round.
+
+Robinhood Chain's operated sequencer and chain governance are part of the target
+chain trusted computing base. V1 assumes the sequencer follows the chain's
+canonical transaction-ordering and timestamp rules in good faith. The Lottery
+does not claim to remain outcome-fair if that sequencer deliberately withholds or
+reorders purchases, or holds back L2 time to select an already-known beacon; such
+behavior violates the accepted sequencer-honesty assumption and is outside the
+public-participant threat model for V1.
 
 Randomness verification SHALL be delegated to the shared `EqualFiDrandRegistry`. Operator reward accounting SHALL be delegated to the standalone `OperatorFeeRouter`. The Lottery SHALL NOT duplicate either responsibility.
 
@@ -188,19 +196,20 @@ A Round state from which ticket purchases can never resume, including settlement
 4. Winner lookup SHALL NOT require iterating across every ticket in the Round.
 5. THE owner resolved for a winning ticket SHALL be the address to which that ticket was attributed at purchase.
 
-### Requirement 7: Sellout Commitment to Future Randomness
+### Requirement 7: Sellout Commitment to a Later Quicknet Round
 
-**User Story:** As a ticket buyer, I want randomness selected only after every ticket is committed, so that no participant can purchase after knowing or selecting the winning randomness.
+**User Story:** As a ticket buyer, I want the Round committed to a Quicknet beacon scheduled strictly after the L2 sellout boundary, so that under the honest-sequencer assumption no public participant can purchase after knowing or selecting the winning randomness.
 
 #### Acceptance Criteria
 
 1. WHEN the final available ticket is purchased, THE Round SHALL become sold out atomically with that purchase.
-2. AT Sellout, THE Lottery SHALL permanently determine the specific future Quicknet Round that will settle the lottery Round.
+2. AT Sellout, THE Lottery SHALL permanently determine the specific Quicknet Round scheduled strictly after the Round's L2 commitment boundary that will settle the lottery Round.
 3. THE selected Quicknet Round SHALL be determined using the Round's snapshotted randomness delay and the canonical round-selection functionality exposed by `EqualFiDrandRegistry`.
 4. THE selected Quicknet Round SHALL correspond to randomness scheduled strictly after the applicable commitment boundary.
-5. THE Lottery SHALL reject a randomness target that was already available or cached before the commitment boundary.
+5. AT Sellout, THE Lottery SHALL reject a randomness target already cached by the Registry, and settlement SHALL reject a target whose Registry posting time does not follow Sellout.
 6. AFTER Sellout, THE selected Quicknet Round SHALL NOT be replaceable by governance, a guardian, the finalizer, or any other account.
 7. AFTER Sellout, THE Lottery SHALL NOT accept additional ticket purchases.
+8. Freshness of the L2 commitment boundary SHALL rely on the documented Robinhood-operated-sequencer honesty assumption; V1 SHALL NOT claim outcome fairness against a sequencer that deliberately manipulates transaction inclusion, ordering, or permitted L2 timestamp progression.
 
 ### Requirement 8: Shared drand Quicknet Randomness
 
@@ -213,8 +222,9 @@ A Round state from which ticket purchases can never resume, including settlement
 3. THE Lottery SHALL accept a Round as settleable only when the exact committed Quicknet Round has been successfully verified by the Registry.
 4. IF the committed Quicknet Round is already cached by the Registry, THE Lottery SHALL be able to reuse it without requiring another BLS verification.
 5. IF the committed Quicknet Round has not yet been cached, THE settlement path SHALL permit the caller to provide the proof necessary for the Registry to verify and cache it.
-6. THE Lottery SHALL NOT use `blockhash`, `prevrandao`, sequencer-selected entropy, administrator-supplied entropy, or another fallback randomness source to settle a sold-out Round.
+6. THE Lottery SHALL NOT use `blockhash`, `prevrandao`, a sequencer-provided random value, administrator-supplied entropy, or another fallback randomness source to settle a sold-out Round.
 7. Failure or delay of the Quicknet beacon SHALL NOT authorize replacement of the committed randomness source.
+8. The drand construction SHALL protect target immutability and winner derivation against public participants, relayers, finalizers, and ordinary configuration governance under the deployed code and the Robinhood-operated-sequencer honesty assumption; it SHALL NOT be represented as removing the chain sequencer's inherent ordering and timestamp influence or the separately documented pre-finalization Diamond upgrade trust.
 
 ### Requirement 9: Domain-Separated Winner Selection
 
@@ -440,6 +450,7 @@ A Round state from which ticket purchases can never resume, including settlement
 7. Testnet validation SHALL demonstrate that failed Operator revenue ingress does not block Round settlement.
 8. Testnet validation SHALL demonstrate successful direct contribution of each exercised Payment Token to the configured Operator Fee Router integration when that dependency is available.
 9. Testnet validation SHALL demonstrate concurrent active Rounds using at least two different governance-enabled Payment Tokens, including isolated purchase, settlement, claim, refund, Treasury, and Operator accounting.
+10. Testnet validation SHALL demonstrate the production L2 timestamp-based target-selection path but SHALL NOT be represented as proving resistance to a malicious Robinhood sequencer.
 
 ### Requirement 24: Diamond Upgradeability and Permanent Immutability
 
@@ -467,7 +478,7 @@ A Round state from which ticket purchases can never resume, including settlement
 #### Acceptance Criteria
 
 1. BEFORE a production release, THE `EqualFiDrandRegistry` implementation SHALL have a versioned formal-verification package covering the source revision and compiled EVM runtime bytecode intended for deployment; the release gate SHALL confirm that the deployed bytecode matches.
-2. THE formal model SHALL prove the boundary, strict-future minimality, ordering, and overflow behavior of `roundTime` and `firstRoundAfter` for their complete supported input domains.
+2. THE formal model SHALL prove the boundary, strictly-after-supplied-timestamp minimality, ordering, and overflow behavior of `roundTime` and `firstRoundAfter` for their complete supported input domains.
 3. THE formal model SHALL prove that every newly stored beacon is bound to the compiled Quicknet public key, Quicknet DST, exact encoded Round, and submitted signature point used by verification.
 4. THE formal model SHALL cover all contract-side input validation and representation handling, including supported lengths, compressed-point flags and decompression, uncompressed-point decoding, infinity and field bounds, subgroup-validation calls, message serialization, precompile calldata, and precompile return-data handling.
 5. SUBJECT to the documented EIP-2537 precompile model, THE formal model SHALL prove both that storage is unreachable unless the required BLS pairing verification succeeds and that a valid supported proof is stored when ordinary call preconditions hold.
@@ -476,9 +487,10 @@ A Round state from which ticket purchases can never resume, including settlement
 8. THE formal model SHALL prove that no caller, owner, governance role, proxy path, or alternate entry point can bypass verification or replace a stored beacon.
 9. REQUIRED proof artifacts SHALL pin the Registry source revision, compiler and settings, dependency revisions, formal tool version, specification revision, and verified runtime bytecode hash.
 10. A required proof obligation SHALL NOT be reported as passing when its run times out, returns unknown, is vacuous, relies on an unconstrained success oracle, or depends on an undocumented assumption.
-11. THE proof report SHALL enumerate the trusted computing base and proof exclusions, including the EIP-2537 implementation, cryptographic assumptions, official Quicknet trust anchor, Solidity compiler, and Robinhood Chain execution environment.
+11. THE Registry proof report SHALL enumerate the trusted computing base and proof exclusions for its verification claim, including the EIP-2537 implementation, cryptographic assumptions, official Quicknet trust anchor, Solidity compiler, and Robinhood Chain execution environment.
 12. Official Quicknet differential vectors and Robinhood runtime validation SHALL test the concrete cryptographic and precompile assumptions that the formal model abstracts; those tests SHALL be reported separately from machine-checked proofs.
-13. THE project SHALL NOT describe the formal package as proving drand network liveness, threshold-operator honesty, cryptographic hardness, compiler correctness, or EIP-2537 client correctness unless those components are separately verified.
+13. THE project SHALL NOT describe the formal package as proving drand network liveness, threshold-operator honesty, cryptographic hardness, compiler correctness, EIP-2537 client correctness, or sequencer ordering and timestamp honesty unless those components are separately verified.
+14. Lottery commitment proofs SHALL state that they establish ordering strictly after the supplied L2 timestamp boundary and exclude wall-clock freshness, fair transaction ordering, and malicious-sequencer behavior.
 
 ---
 
@@ -493,7 +505,8 @@ A Round state from which ticket purchases can never resume, including settlement
 - Concurrent active Rounds may use different Payment Tokens, including STATICS, USDG, or WETH.
 - Native ETH is not accepted for ticket purchases.
 - Tickets are non-transferable accounting entries rather than individual NFTs.
-- Randomness comes exclusively from a previously committed future drand Quicknet Round verified by `EqualFiDrandRegistry`.
+- Randomness comes exclusively from a previously committed drand Quicknet Round scheduled strictly after the L2 commitment boundary and verified by `EqualFiDrandRegistry`.
+- The Round-selection freshness claim assumes honest transaction ordering and L2 timestamp progression by the Robinhood-operated sequencer; malicious behavior violates that accepted chain trust assumption.
 - Sold-out Rounds have no blockhash, `prevrandao`, administrator, or alternate-RNG fallback.
 - Unsold expired Rounds return 100% of participant principal.
 - Sold-out Rounds cannot be cancelled.
