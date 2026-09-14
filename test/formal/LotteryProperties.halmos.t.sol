@@ -70,9 +70,12 @@ contract LotterySettlementHalmosTest is Test {
         LotterySettlementHarness settlement = new LotterySettlementHarness();
         AllocationObservation memory observed =
             settlement.executeAllocation(gross, rawWinnerBps, rawOperatorBps, tip);
-        assert(
-            observed.winner + observed.operator + observed.treasury + observed.finalizer == gross
-        );
+        unchecked {
+            assert(
+                observed.winner + observed.operator + observed.treasury + observed.finalizer
+                    == gross
+            );
+        }
     }
 
     function check_settlementPreservesPaymentTokenSolvency(
