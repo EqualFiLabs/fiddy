@@ -14,6 +14,7 @@ import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { FacetCut, FacetCutAction } from "../../src/shared/DiamondTypes.sol";
 import { AssetAccounting, RoundStatus } from "../../src/shared/Types.sol";
 import {
+    AllocationObservation,
     ClaimObservation,
     CommitmentObservation,
     FormalRegistry,
@@ -63,12 +64,15 @@ contract LotterySettlementHalmosTest is Test {
         uint256 rawOperatorBps,
         uint256 rawTip
     ) public {
-        (uint64 gross, SettlementObservation memory observed) =
-            _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
-        AssetAccounting memory accounting = observed.paymentAccounting;
+        uint64 gross = uint64(bound(rawGross, 1, type(uint64).max));
+        uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
+        uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
+        uint64 tip = uint64(bound(rawTip, 0, type(uint64).max));
+        LotterySettlementHarness settlement = new LotterySettlementHarness();
+        AllocationObservation memory observed =
+            settlement.executeAllocation(gross, winnerBps, operatorBps, tip);
         assert(
-            accounting.winnerLiability + accounting.pendingOperatorRevenueTotal
-                    + accounting.treasuryAvailable + accounting.finalizerLiability == gross
+            observed.winner + observed.operator + observed.treasury + observed.finalizer == gross
         );
     }
 

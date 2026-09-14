@@ -35,10 +35,11 @@ integration and stateful invariants cover those paths. The Registry summary does
 Quicknet arithmetic or cryptography; those belong to the separate `EqualFiDrandRegistry` proof
 package.
 
-The settlement rule calls the shared production allocation and accounting implementations for one
-bounded Round. It covers every nonzero `uint64` gross amount, every valid Winner and Operator BPS
-value, and every `uint64` Finalizer Tip. The harness starts the payment token and one unrelated
-token exactly solvent, then proves revenue conservation, payment-token solvency,
+The settlement rules call the shared production allocation and accounting implementations for one
+bounded Round. The conservation rule isolates the pure allocation helper; the state-transition
+rules start the payment token and one unrelated token exactly solvent. Together they cover every
+nonzero `uint64` gross amount, every valid Winner and Operator BPS value, and every `uint64`
+Finalizer Tip, then prove revenue conservation, payment-token solvency,
 aggregate/versioned Operator equality, and no mutation of the unrelated token's custody or
 accounting. It does not prove Registry acquisition, ticket-owner lookup, or the external
 `settleRound` state gate; concrete integration tests cover those paths.

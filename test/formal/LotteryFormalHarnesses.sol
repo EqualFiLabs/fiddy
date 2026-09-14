@@ -109,6 +109,13 @@ struct SettlementObservation {
     RoundStatus status;
 }
 
+struct AllocationObservation {
+    uint256 winner;
+    uint256 operator;
+    uint256 treasury;
+    uint256 finalizer;
+}
+
 struct ClaimObservation {
     uint256 firstAmount;
     uint256 remainingClaim;
@@ -175,6 +182,22 @@ contract LotteryCommitmentHarness is LotteryFacet {
 contract LotterySettlementHarness is SettlementFacet {
     constructor() {
         LibReentrancy.initialize();
+    }
+
+    function executeAllocation(
+        uint64 gross,
+        uint16 winnerBps,
+        uint16 operatorBps,
+        uint64 finalizerTip
+    ) external pure returns (AllocationObservation memory result) {
+        SettlementAmounts memory amounts =
+            _allocateValues(gross, winnerBps, operatorBps, finalizerTip);
+        result = AllocationObservation({
+            winner: amounts.winner,
+            operator: amounts.operator,
+            treasury: amounts.treasury,
+            finalizer: amounts.finalizer
+        });
     }
 
     function executeSettlement(
