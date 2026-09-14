@@ -157,12 +157,12 @@ contract LotteryFacet is ILottery {
         uint256 roundId,
         IEqualFiDrandRegistry registry,
         uint32 randomnessDelay
-    ) internal {
+    ) internal returns (uint256 commitmentBoundary, uint64 target) {
         round.status = RoundStatus.SoldOut;
         round.selloutAt = block.timestamp.toUint64();
 
-        uint256 commitmentBoundary = block.timestamp + randomnessDelay;
-        uint64 target = registry.firstRoundAfter(commitmentBoundary);
+        commitmentBoundary = block.timestamp + randomnessDelay;
+        target = registry.firstRoundAfter(commitmentBoundary);
         if (target == 0 || registry.roundTime(target) <= commitmentBoundary) {
             revert Errors.InvalidRandomnessRound(target);
         }

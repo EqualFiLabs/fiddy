@@ -163,10 +163,9 @@ contract LotteryCommitmentHarness is LotteryFacet {
         uint256 roundId = 1;
         Round storage round = gs.rounds[roundId];
 
-        _commitSelloutTarget(round, roundId, registry, delay);
-        result.drandRound = round.drandRound;
-        result.registryRoundTime = registry.roundTime(round.drandRound);
-        result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;
+        (result.commitmentBoundary, result.drandRound) =
+            _commitSelloutTarget(round, roundId, registry, delay);
+        result.registryRoundTime = registry.roundTime(result.drandRound);
         result.status = round.status;
 
         uint32 replacementDelay = delay == type(uint32).max ? 0 : delay + 1;
