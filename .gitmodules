@@ -7,3 +7,6 @@
 [submodule "lib/drand-registry"]
 	path = lib/drand-registry
 	url = https://github.com/EqualFiLabs/drand-registry
+[submodule "lib/operator-fee-router"]
+	path = lib/operator-fee-router
+	url = https://github.com/EqualFiLabs/operator-fee-router
