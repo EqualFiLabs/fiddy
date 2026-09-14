@@ -51,7 +51,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
 
     function test_WinnerClaimsExactAmountToArbitraryReceiver() public {
         uint256 roundId = _settledRoundA(finalizer);
-        Round memory settled = stateView.roundState(roundId);
+        Round memory settled = stateView.round(roundId);
         address winner = settled.winner;
         uint256 receiverBefore = tokenA.balanceOf(receiver);
 
@@ -61,7 +61,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         assertEq(amount, 80);
         assertEq(tokenA.balanceOf(receiver), receiverBefore + 80);
         assertEq(tokenA.balanceOf(address(diamond)), 20);
-        assertEq(stateView.roundState(roundId).winnerClaimable, 0);
+        assertEq(stateView.round(roundId).winnerClaimable, 0);
         assertEq(stateView.assetAccounting(address(tokenA)).winnerLiability, 0);
 
         vm.expectRevert(Errors.NoWinnerClaim.selector);
@@ -71,14 +71,14 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
 
     function test_OnlyRecordedWinnerCanClaim() public {
         uint256 roundId = _settledRoundA(finalizer);
-        address winner = stateView.roundState(roundId).winner;
+        address winner = stateView.round(roundId).winner;
         address outsider = winner == alice ? bob : alice;
 
         vm.expectRevert(abi.encodeWithSelector(Errors.NotWinner.selector, outsider));
         vm.prank(outsider);
         claims.claimWinner(roundId, receiver);
 
-        assertEq(stateView.roundState(roundId).winnerClaimable, 80);
+        assertEq(stateView.round(roundId).winnerClaimable, 80);
         assertEq(stateView.assetAccounting(address(tokenA)).winnerLiability, 80);
     }
 
@@ -87,7 +87,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         uint256 roundId = lottery.openRound(1, 2);
         vm.prank(bob);
         lottery.buyTickets(roundId, 3);
-        vm.warp(stateView.roundState(roundId).expiresAt);
+        vm.warp(stateView.round(roundId).expiresAt);
         lottery.expireRound(roundId);
 
         vm.prank(alice);
@@ -98,8 +98,8 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         assertEq(tokenA.balanceOf(receiver), 20);
         assertEq(tokenA.balanceOf(bob), 10_000);
         assertEq(tokenA.balanceOf(address(diamond)), 0);
-        assertEq(stateView.refundCredit(roundId, alice), 0);
-        assertEq(stateView.refundCredit(roundId, bob), 0);
+        assertEq(stateView.refundableAmount(roundId, alice), 0);
+        assertEq(stateView.refundableAmount(roundId, bob), 0);
         assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 0);
 
         vm.expectRevert(Errors.NoRefund.selector);
@@ -110,7 +110,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
     function test_FinalizerClaimsTipsAggregatedByToken() public {
         uint256 firstRoundId = _sellOutRoundA();
         uint256 secondRoundId = _sellOutRoundA();
-        Round memory first = stateView.roundState(firstRoundId);
+        Round memory first = stateView.round(firstRoundId);
         registry.cache(first.drandRound, keccak256("shared"), first.selloutAt + 1);
         vm.startPrank(finalizer);
         settlement.settleRound(firstRoundId, "");
@@ -153,11 +153,11 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
 
     function test_PauseCannotBlockWinnerRefundOrFinalizerClaims() public {
         uint256 settledRoundId = _settledRoundA(finalizer);
-        address winner = stateView.roundState(settledRoundId).winner;
+        address winner = stateView.round(settledRoundId).winner;
 
         vm.prank(alice);
         uint256 expiredRoundId = lottery.openRound(1, 1);
-        vm.warp(stateView.roundState(expiredRoundId).expiresAt);
+        vm.warp(stateView.round(expiredRoundId).expiresAt);
         lottery.expireRound(expiredRoundId);
         vm.prank(guardian);
         governance.setPaused(true);
@@ -183,7 +183,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         token.approve(address(diamond), type(uint256).max);
         vm.prank(alice);
         uint256 roundId = lottery.openRound(version, 2);
-        vm.warp(stateView.roundState(roundId).expiresAt);
+        vm.warp(stateView.round(roundId).expiresAt);
         lottery.expireRound(roundId);
         token.setFeesEnabled(true);
 
@@ -193,7 +193,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         vm.prank(alice);
         claims.claimRefund(roundId, receiver);
 
-        assertEq(stateView.refundCredit(roundId, alice), 20);
+        assertEq(stateView.refundableAmount(roundId, alice), 20);
         assertEq(stateView.assetAccounting(address(token)).refundLiability, 20);
         assertEq(token.balanceOf(address(diamond)), 20);
         assertEq(token.balanceOf(receiver), 0);
@@ -207,7 +207,7 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         token.approve(address(diamond), type(uint256).max);
         vm.prank(alice);
         uint256 roundId = lottery.openRound(version, 2);
-        vm.warp(stateView.roundState(roundId).expiresAt);
+        vm.warp(stateView.round(roundId).expiresAt);
         lottery.expireRound(roundId);
         token.configureAttack(address(diamond), roundId);
 
@@ -215,18 +215,18 @@ contract LotteryClaimsTest is LotteryIntegrationSetup {
         vm.prank(alice);
         claims.claimRefund(roundId, receiver);
 
-        assertEq(stateView.refundCredit(roundId, alice), 20);
+        assertEq(stateView.refundableAmount(roundId, alice), 20);
         assertEq(stateView.assetAccounting(address(token)).refundLiability, 20);
         assertEq(token.balanceOf(address(diamond)), 20);
     }
 
     function _settledRoundA(address roundFinalizer) private returns (uint256 roundId) {
         roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         registry.cache(soldOut.drandRound, keccak256("claim randomness"), soldOut.selloutAt + 1);
         vm.prank(roundFinalizer);
         settlement.settleRound(roundId, "");
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Settled));
+        assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.Settled));
     }
 
     function _createTokenConfig(address paymentToken) private returns (uint64 version) {

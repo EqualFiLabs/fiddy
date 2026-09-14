@@ -40,7 +40,7 @@ contract ReentrantDrandRegistry is IEqualFiDrandRegistry {
 contract LotterySettlementTest is LotteryIntegrationSetup {
     function test_SubmittedProofSettlesIntoExactTokenLiabilities() public {
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         bytes memory proof = hex"123456";
         _prepareProof(roundId, proof);
         uint256 diamondBalanceBefore = tokenA.balanceOf(address(diamond));
@@ -48,7 +48,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         vm.prank(finalizer);
         (uint32 winningTicket, address winner) = settlement.settleRound(roundId, proof);
 
-        Round memory settled = stateView.roundState(roundId);
+        Round memory settled = stateView.round(roundId);
         bytes32 expectedSeed = keccak256(
             abi.encode(
                 registry.randomnessOf(soldOut.drandRound), block.chainid, address(diamond), roundId
@@ -82,7 +82,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
 
     function test_ReusesCachedCommittedRandomnessWithoutProof() public {
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         bytes32 randomness = keccak256("cached randomness");
         registry.cache(soldOut.drandRound, randomness, soldOut.selloutAt + 1);
 
@@ -91,12 +91,12 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
 
         bytes32 expectedSeed =
             keccak256(abi.encode(randomness, block.chainid, address(diamond), roundId));
-        assertEq(stateView.roundState(roundId).applicationSeed, expectedSeed);
+        assertEq(stateView.round(roundId).applicationSeed, expectedSeed);
     }
 
     function test_RejectsUnavailableRandomnessWithoutChangingSettlementState() public {
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         vm.warp(registry.roundTime(soldOut.drandRound));
         registry.setReturnWithoutStoring(true);
 
@@ -106,7 +106,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         vm.prank(finalizer);
         settlement.settleRound(roundId, hex"1234");
 
-        Round memory unchanged = stateView.roundState(roundId);
+        Round memory unchanged = stateView.round(roundId);
         assertEq(uint8(unchanged.status), uint8(RoundStatus.SoldOut));
         assertEq(unchanged.winner, address(0));
         assertEq(unchanged.winnerClaimable, 0);
@@ -115,7 +115,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
 
     function test_RegistryProofFailureBubblesAndPreservesEscrow() public {
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         bytes memory expectedProof = hex"aaaa";
         registry.expectProof(soldOut.drandRound, expectedProof);
         vm.warp(registry.roundTime(soldOut.drandRound));
@@ -124,13 +124,13 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         vm.prank(finalizer);
         settlement.settleRound(roundId, hex"bbbb");
 
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.SoldOut));
+        assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.SoldOut));
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 100);
     }
 
     function test_RejectsRandomnessPostedAtOrBeforeSellout() public {
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         registry.cache(soldOut.drandRound, keccak256("stale"), soldOut.selloutAt);
 
         vm.expectRevert(
@@ -143,7 +143,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         );
         settlement.settleRound(roundId, "");
 
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.SoldOut));
+        assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.SoldOut));
     }
 
     function test_RejectsOpenExpiredAndAlreadySettledRounds() public {
@@ -152,7 +152,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, openRoundId));
         settlement.settleRound(openRoundId, "");
 
-        Round memory open = stateView.roundState(openRoundId);
+        Round memory open = stateView.round(openRoundId);
         vm.warp(open.expiresAt);
         lottery.expireRound(openRoundId);
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, openRoundId));
@@ -176,7 +176,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         vm.prank(finalizer);
         settlement.settleRound(roundId, proof);
 
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Settled));
+        assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.Settled));
     }
 
     function test_RegistryCannotReenterSettlement() public {
@@ -186,21 +186,21 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
             IntegrationConfig(address(reentrantRegistry), address(router))
         );
         uint256 roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         vm.warp(reentrantRegistry.roundTime(soldOut.drandRound));
 
         vm.expectRevert(Errors.Reentrancy.selector);
         settlement.settleRound(roundId, hex"1234");
 
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.SoldOut));
+        assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.SoldOut));
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 100);
     }
 
     function test_DomainSeparatesRoundsUsingSameRegistryRandomness() public {
         uint256 firstRoundId = _sellOutRoundA();
         uint256 secondRoundId = _sellOutRoundA();
-        Round memory first = stateView.roundState(firstRoundId);
-        Round memory second = stateView.roundState(secondRoundId);
+        Round memory first = stateView.round(firstRoundId);
+        Round memory second = stateView.round(secondRoundId);
         assertEq(first.drandRound, second.drandRound);
 
         bytes32 sharedRandomness = keccak256("shared randomness");
@@ -208,8 +208,8 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         settlement.settleRound(firstRoundId, "");
         settlement.settleRound(secondRoundId, "");
 
-        bytes32 firstSeed = stateView.roundState(firstRoundId).applicationSeed;
-        bytes32 secondSeed = stateView.roundState(secondRoundId).applicationSeed;
+        bytes32 firstSeed = stateView.round(firstRoundId).applicationSeed;
+        bytes32 secondSeed = stateView.round(secondRoundId).applicationSeed;
         assertNotEq(firstSeed, secondSeed);
         assertEq(
             firstSeed,
@@ -229,7 +229,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
 
         vm.prank(alice);
         uint256 roundId = lottery.openRound(3, 10);
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         registry.cache(soldOut.drandRound, keccak256("cap"), soldOut.selloutAt + 1);
         vm.prank(finalizer);
         settlement.settleRound(roundId, "");
