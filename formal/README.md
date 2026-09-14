@@ -6,7 +6,9 @@ operator tooling. Do not install, probe, or invoke Halmos on an ordinary develop
 
 ## Required Halmos rules
 
-- `check_selloutCommitsToStrictlyFutureRoundAndIgnoresCatalogChanges`
+- `check_selloutCommitmentIsStrictlyFuture`
+- `check_selloutCommitmentMatchesRegistrySelection`
+- `check_selloutCommitmentIgnoresCatalogChanges`
 - `check_settlementConservesRevenueAndIsolatesTokens`
 - `check_winnerClaimCannotRepeat`
 - `check_refundClaimCannotRepeat`

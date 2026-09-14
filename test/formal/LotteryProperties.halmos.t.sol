@@ -29,20 +29,31 @@ import {
 } from "./LotteryFormalHarnesses.sol";
 
 contract LotteryCommitmentHalmosTest is Test {
-    function check_selloutCommitsToStrictlyFutureRoundAndIgnoresCatalogChanges(uint256 rawDelay)
-        public
-    {
-        uint32 delay = uint32(bound(rawDelay, 0, type(uint32).max));
-        FormalRegistry registry = new FormalRegistry(false);
-        LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
-
-        CommitmentObservation memory observed = lottery.executeCommitment(registry, delay);
-
+    function check_selloutCommitmentIsStrictlyFuture(uint256 rawDelay) public {
+        (, CommitmentObservation memory observed) = _executeCommitment(rawDelay);
         assert(uint8(observed.status) == uint8(RoundStatus.SoldOut));
         assert(observed.registryRoundTime > observed.commitmentBoundary);
+    }
+
+    function check_selloutCommitmentMatchesRegistrySelection(uint256 rawDelay) public {
+        (, CommitmentObservation memory observed) = _executeCommitment(rawDelay);
         assert(observed.drandRound == uint64(observed.commitmentBoundary + 1));
+    }
+
+    function check_selloutCommitmentIgnoresCatalogChanges(uint256 rawDelay) public {
+        (uint32 delay, CommitmentObservation memory observed) = _executeCommitment(rawDelay);
         assert(observed.catalogDelay == (delay == type(uint32).max ? 0 : delay + 1));
         assert(observed.targetAfterCalls == observed.drandRound);
+    }
+
+    function _executeCommitment(uint256 rawDelay)
+        private
+        returns (uint32 delay, CommitmentObservation memory observed)
+    {
+        delay = uint32(bound(rawDelay, 0, type(uint32).max));
+        FormalRegistry registry = new FormalRegistry(false);
+        LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
+        observed = lottery.executeCommitment(registry, delay);
     }
 }
 
