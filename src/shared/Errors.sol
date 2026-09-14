@@ -28,6 +28,7 @@ library Errors {
     error NotGuardian(address caller);
     error NotWinner(address caller);
     error ProtocolPaused();
+    error PurchaseEntryNotFound(uint256 roundId, uint256 index);
     error RandomnessPredatesSellout(uint64 drandRound, uint64 postedAt, uint64 selloutAt);
     error RandomnessUnavailable(uint64 drandRound);
     error Reentrancy();

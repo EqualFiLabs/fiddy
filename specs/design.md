@@ -771,6 +771,8 @@ src/facets/LotteryViewFacet.sol
 Representative interface:
 
 ```solidity
+function latestLotteryConfigVersion() external view returns (uint64);
+function latestRoundId() external view returns (uint256);
 function round(uint256 roundId) external view returns (Round memory);
 function roundConfig(uint256 roundId) external view returns (RoundConfigSnapshot memory);
 function ticketOwner(uint256 roundId, uint32 ticket) external view returns (address);
@@ -1355,6 +1357,7 @@ error ConfigDisabled(uint64 version);
 error ActiveRoundLimitReached();
 error InvalidTicketQuantity();
 error TicketLimitExceeded();
+error PurchaseEntryNotFound(uint256 roundId, uint256 index);
 error InexactTokenTransfer(address asset, uint256 expected, uint256 spent, uint256 received);
 error RoundNotFound(uint256 roundId);
 error RoundNotOpen(uint256 roundId);

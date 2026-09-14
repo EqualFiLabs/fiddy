@@ -110,7 +110,7 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
 
         vm.prank(alice);
         uint256 roundId = lottery.openRound(version, 1);
-        assertEq(stateView.roundState(roundId).config.operatorProtocolBps, 0);
+        assertEq(stateView.round(roundId).config.operatorProtocolBps, 0);
     }
 
     function test_HistoricalRevenueUsesSnapshottedRouterAndToken() public {
@@ -122,7 +122,7 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
 
         vm.prank(alice);
         uint256 roundB = lottery.openRound(2, 5);
-        Round memory soldOutB = stateView.roundState(roundB);
+        Round memory soldOutB = stateView.round(roundB);
         registry.cache(soldOutB.drandRound, keccak256("token B"), soldOutB.selloutAt + 1);
         settlement.settleRound(roundB, "");
 
@@ -186,7 +186,7 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         token.approve(address(diamond), type(uint256).max);
         vm.prank(alice);
         uint256 roundId = lottery.openRound(version, 10);
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         registry.cache(soldOut.drandRound, keccak256("sender fee"), soldOut.selloutAt + 1);
         settlement.settleRound(roundId, "");
         token.setFeesEnabled(true);
@@ -242,7 +242,7 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
 
     function _settleRoundA() private returns (uint256 roundId) {
         roundId = _sellOutRoundA();
-        Round memory soldOut = stateView.roundState(roundId);
+        Round memory soldOut = stateView.round(roundId);
         registry.cache(soldOut.drandRound, keccak256("revenue randomness"), soldOut.selloutAt + 1);
         vm.prank(finalizer);
         settlement.settleRound(roundId, "");
