@@ -64,12 +64,12 @@ contract LotterySettlementHalmosTest is Test {
         uint16 rawOperatorBps,
         uint64 tip
     ) public {
-        gross = uint64(bound(gross, 1, type(uint64).max));
-        uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
-        uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
+        vm.assume(gross != 0);
+        vm.assume(rawWinnerBps <= 10_000);
+        vm.assume(rawOperatorBps <= 10_000);
         LotterySettlementHarness settlement = new LotterySettlementHarness();
         AllocationObservation memory observed =
-            settlement.executeAllocation(gross, winnerBps, operatorBps, tip);
+            settlement.executeAllocation(gross, rawWinnerBps, rawOperatorBps, tip);
         assert(
             observed.winner + observed.operator + observed.treasury + observed.finalizer == gross
         );
@@ -131,15 +131,15 @@ contract LotterySettlementHalmosTest is Test {
         uint16 rawOperatorBps,
         uint64 rawTip
     ) private returns (uint64 gross, SettlementObservation memory observed) {
-        gross = uint64(bound(rawGross, 1, type(uint64).max));
-        uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
-        uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
-        uint64 tip = uint64(bound(rawTip, 0, type(uint64).max));
+        vm.assume(rawGross != 0);
+        vm.assume(rawWinnerBps <= 10_000);
+        vm.assume(rawOperatorBps <= 10_000);
+        gross = rawGross;
         FormalToken paymentToken = new FormalToken("PRIMARY");
         FormalToken isolatedToken = new FormalToken("ISOLATED");
         LotterySettlementHarness settlement = new LotterySettlementHarness();
         observed = settlement.executeSettlement(
-            paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
+            paymentToken, isolatedToken, gross, rawWinnerBps, rawOperatorBps, rawTip
         );
     }
 }
