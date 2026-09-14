@@ -43,7 +43,15 @@ library Errors {
     error StaleRandomnessRound(uint64 drandRound);
     error TicketLimitExceeded();
     error IntegrationNotConfigured();
+    error IntegrationNotFound(uint64 version);
+    error InsufficientOperatorRevenue(uint64 version, uint256 requested, uint256 available);
+    error InsufficientTreasuryBalance(uint256 requested, uint256 available);
+    error NativeTransferFailed();
+    error NoNativeSurplus();
+    error NoTokenSurplus();
+    error OperatorRouterUnavailable(address router, address asset);
     error UnexpectedInitializationData();
     error UnpauseRequiresAuthority(address caller);
+    error ZeroAmount();
     error InexactTokenTransfer(address asset, uint256 expected, uint256 spent, uint256 received);
 }

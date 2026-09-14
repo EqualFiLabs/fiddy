@@ -8,6 +8,7 @@ import { ILottery } from "../interfaces/ILottery.sol";
 import { LibExactToken } from "../libraries/LibExactToken.sol";
 import { LibLotteryConfig } from "../libraries/LibLotteryConfig.sol";
 import { LibLotteryStorage } from "../libraries/LibLotteryStorage.sol";
+import { LibOperatorFeeRouter } from "../libraries/LibOperatorFeeRouter.sol";
 import { LibReentrancy } from "../libraries/LibReentrancy.sol";
 import { LibTicketRanges } from "../libraries/LibTicketRanges.sol";
 import { Errors } from "../shared/Errors.sol";
@@ -50,6 +51,11 @@ contract LotteryFacet is ILottery {
         if (integrationVersion == 0) revert Errors.IntegrationNotConfigured();
 
         LotteryConfig storage config = gs.configs[configVersion];
+        if (config.operatorProtocolBps != 0) {
+            LibOperatorFeeRouter.enforceReady(
+                integrations.integrations[integrationVersion].operatorFeeRouter, config.paymentToken
+            );
+        }
         _validateQuantity(ticketQuantity, config.ticketCount, config.maxTicketsPerPurchase);
 
         uint256 expiration = block.timestamp + config.salesDuration;
