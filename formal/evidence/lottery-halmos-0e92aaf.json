@@ -1,0 +1,181 @@
+{
+  "sourceCommit": "0e92aaf7095d212fa9b97f2bed747d5a287306c9",
+  "compiler": {
+    "solc": "0.8.30",
+    "solcLongVersion": "0.8.30+commit.73712a01.Linux.g++",
+    "solcBinarySha256": "f3e987dc6ecebd4bd350c48edcbc320b46cf9e3109bd3fc3d88f1acaf4c428f7",
+    "optimizer": true,
+    "optimizerRuns": 200,
+    "evmVersion": "osaka"
+  },
+  "tools": {
+    "foundry": "1.7.1",
+    "halmos": "0.3.3",
+    "z3": "4.12.6"
+  },
+  "result": {
+    "exitCode": 0,
+    "requiredRules": 12,
+    "successfulRules": 12,
+    "counterexampleModels": 0,
+    "boundedLoops": 0,
+    "rawResultSha256": "85a59e90db4ce8527f54e4e3c6f0e99a5ba8b06c09607a044f6c1a8c0ffb9cc1",
+    "rawLogSha256": "2da21bf0eb3e3ce41edb91b10e5592bc1818f21d9e5543ff738e39a37baf52b6"
+  },
+  "runtimeBindings": [
+    {
+      "contract": "StaticsLotteryDiamond",
+      "bytes": 260,
+      "metadataBytes": 51,
+      "fullKeccak256": "0x7fa423d9c71448d4c24c8cc4591f99a78061ae7c4fcdcccd4f9797b5cd364f29",
+      "logicKeccak256": "0xd64dfeba7961d9e04de9981cc5a8a5fe48d88d188f2af808a496cfc8f2099535"
+    },
+    {
+      "contract": "DiamondCutFacet",
+      "bytes": 3976,
+      "metadataBytes": 51,
+      "fullKeccak256": "0xd2ac2bb785bdc874924b8fe925a7e3a64209c2f0bde645ca4cbe291619034bd2",
+      "logicKeccak256": "0x76d3863546d900ea27a4655108ce173849b1f6cfc186376b33f6c0e8e775fe0f"
+    },
+    {
+      "contract": "GovernanceFacet",
+      "bytes": 4488,
+      "metadataBytes": 51,
+      "fullKeccak256": "0x3fbf80fe77b75166233b75dff9ba36bab6e1f478ffdfba32be5e316539fdd458",
+      "logicKeccak256": "0x019d7be997a8fcae90681a65594d99e80b8eebac03bfe77fee0abf4dbee6f577"
+    },
+    {
+      "contract": "LotteryFacet",
+      "bytes": 6246,
+      "metadataBytes": 51,
+      "fullKeccak256": "0xe0a083c3c00eeef84b8962fe045208624e989c28f583ba417aa423333e5541cb",
+      "logicKeccak256": "0xf23f7c386a2333f3ad995ba63bc3b1736577552244ec9a8d44c7122fad2436a0"
+    },
+    {
+      "contract": "SettlementFacet",
+      "bytes": 3445,
+      "metadataBytes": 51,
+      "fullKeccak256": "0x09a429508c0a8feb27cd8fa590be982d47a49123db049bb02f36fa78c1bdd956",
+      "logicKeccak256": "0x84188624502243051ccecd33a44f5f1bc0d2f15294397fcf60c7f44622609f8b"
+    },
+    {
+      "contract": "ClaimsFacet",
+      "bytes": 2597,
+      "metadataBytes": 51,
+      "fullKeccak256": "0xdb4d2a248bfd010b2a0927dd14c602cbe155b17589cc3bd5e4d6a6cf9f6d16bb",
+      "logicKeccak256": "0x284df4d474a090d3184332aa6c2cbe05996dc5fc93463735bf92b5631aed2612"
+    },
+    {
+      "contract": "RevenueFacet",
+      "bytes": 4557,
+      "metadataBytes": 51,
+      "fullKeccak256": "0xbae29cd29cc06ea6689bb6374f86193799e9926093160d2feafef8690d06ed5e",
+      "logicKeccak256": "0x41af471f96908b8a040ea78195586f3630123d0eb6b8bef2f967a59e7226d01d"
+    },
+    {
+      "contract": "LotteryViewFacet",
+      "bytes": 4720,
+      "metadataBytes": 51,
+      "fullKeccak256": "0x39478b27f7a7b5bdbd05217437587022155991b021bf411a0f866f66ab2daab5",
+      "logicKeccak256": "0x5c6ebd4e27147dbc0957ec4334bf594e06b492f62b0b8ee700dd39b1db069bc8"
+    }
+  ],
+  "rules": [
+    {
+      "contract": "LotteryClaimsHalmosTest",
+      "name": "check_refundClaimCannotRepeat(uint256)",
+      "paths": 5,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryClaimsHalmosTest",
+      "name": "check_winnerClaimCannotRepeat(uint256)",
+      "paths": 5,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryCommitmentHalmosTest",
+      "name": "check_selloutCommitmentIgnoresCatalogChanges(uint256)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryCommitmentHalmosTest",
+      "name": "check_selloutCommitmentIsStrictlyFuture(uint256)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryCommitmentHalmosTest",
+      "name": "check_selloutCommitmentMatchesRegistrySelection(uint256)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryCutsHalmosTest",
+      "name": "check_cutFinalizationCannotBeReversed()",
+      "paths": 1,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotteryRevenueHalmosTest",
+      "name": "check_operatorFlushIsAtomicAndTokenIsolated(uint256,uint256,bool)",
+      "paths": 51,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotterySettlementHalmosTest",
+      "name": "check_settlementConservesRevenue(uint64,uint16,uint16,uint64)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotterySettlementHalmosTest",
+      "name": "check_settlementDoesNotMutateIsolatedToken(uint64,uint16,uint16,uint64)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotterySettlementHalmosTest",
+      "name": "check_settlementPreservesPaymentTokenSolvency(uint64,uint16,uint16,uint64)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotterySettlementHalmosTest",
+      "name": "check_settlementRecordsOperatorAndFinalizerLiabilities(uint64,uint16,uint16,uint64)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    },
+    {
+      "contract": "LotterySettlementHalmosTest",
+      "name": "check_settlementRecordsTerminalStatus(uint64,uint16,uint16,uint64)",
+      "paths": 6,
+      "exitCode": 0,
+      "counterexampleModels": 0,
+      "boundedLoops": 0
+    }
+  ]
+}
