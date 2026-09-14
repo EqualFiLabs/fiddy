@@ -428,6 +428,94 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 0);
     }
 
+    function test_GovernanceChangesDoNotAlterOpenRoundSnapshotOrPurchasing() public {
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(1, 2);
+        Round memory beforeChanges = stateView.roundState(roundId);
+
+        LifecycleDrandRegistry nextRegistry = new LifecycleDrandRegistry();
+        LifecycleEndpoint nextRouter = new LifecycleEndpoint();
+        vm.startPrank(authority);
+        governance.setIntegrationConfig(
+            IntegrationConfig(address(nextRegistry), address(nextRouter))
+        );
+        governance.setLotteryConfigEnabled(1, false);
+        governance.setMaxActiveRounds(5);
+        governance.createLotteryConfig(_config(address(tokenB), 99, 50, 2, 7 days, 90));
+        vm.stopPrank();
+
+        vm.prank(bob);
+        lottery.buyTickets(roundId, 1);
+        Round memory afterChanges = stateView.roundState(roundId);
+
+        assertEq(afterChanges.configVersion, beforeChanges.configVersion);
+        assertEq(afterChanges.integrationVersion, beforeChanges.integrationVersion);
+        assertEq(afterChanges.openedAt, beforeChanges.openedAt);
+        assertEq(afterChanges.expiresAt, beforeChanges.expiresAt);
+        assertEq(afterChanges.config.paymentToken, beforeChanges.config.paymentToken);
+        assertEq(afterChanges.config.ticketPrice, beforeChanges.config.ticketPrice);
+        assertEq(afterChanges.config.ticketCount, beforeChanges.config.ticketCount);
+        assertEq(afterChanges.config.salesDuration, beforeChanges.config.salesDuration);
+        assertEq(afterChanges.config.randomnessDelay, beforeChanges.config.randomnessDelay);
+        assertEq(
+            afterChanges.config.maxTicketsPerPurchase, beforeChanges.config.maxTicketsPerPurchase
+        );
+        assertEq(afterChanges.config.winnerBps, beforeChanges.config.winnerBps);
+        assertEq(afterChanges.config.operatorProtocolBps, beforeChanges.config.operatorProtocolBps);
+        assertEq(afterChanges.config.finalizerTip, beforeChanges.config.finalizerTip);
+        assertEq(afterChanges.soldTickets, 3);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.ConfigDisabled.selector, 1));
+        vm.prank(alice);
+        lottery.openRound(1, 1);
+
+        vm.prank(authority);
+        governance.setMaxActiveRounds(0);
+        vm.prank(alice);
+        lottery.buyTickets(roundId, 1);
+        assertEq(stateView.roundState(roundId).soldTickets, 4);
+    }
+
+    function test_ExpiredRoundCannotReopenOrReachSellout() public {
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(1, 5);
+        Round memory open = stateView.roundState(roundId);
+        vm.warp(open.expiresAt);
+        lottery.expireRound(roundId);
+
+        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
+        vm.prank(bob);
+        lottery.buyTickets(roundId, 5);
+        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
+        lottery.expireRound(roundId);
+
+        Round memory expired = stateView.roundState(roundId);
+        assertEq(uint8(expired.status), uint8(RoundStatus.Expired));
+        assertEq(expired.soldTickets, 5);
+        assertEq(expired.drandRound, 0);
+        assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 50);
+    }
+
+    function test_ExpiredRoundReleasesGlobalCapacityWithoutCrossTokenEffects() public {
+        vm.prank(alice);
+        uint256 roundA = lottery.openRound(1, 2);
+        vm.prank(bob);
+        uint256 roundB = lottery.openRound(2, 2);
+
+        vm.warp(stateView.roundState(roundA).expiresAt);
+        lottery.expireRound(roundA);
+        vm.prank(alice);
+        uint256 replacement = lottery.openRound(1, 1);
+
+        assertEq(stateView.activeRoundCount(), 2);
+        assertEq(uint8(stateView.roundState(roundB).status), uint8(RoundStatus.Open));
+        assertEq(uint8(stateView.roundState(replacement).status), uint8(RoundStatus.Open));
+        assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 20);
+        assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 10);
+        assertEq(stateView.assetAccounting(address(tokenB)).activeRoundEscrow, 14);
+        assertEq(stateView.assetAccounting(address(tokenB)).refundLiability, 0);
+    }
+
     function test_RequiresConfiguredIntegration() public {
         DiamondCutFacet cutFacet = new DiamondCutFacet();
         StaticsLotteryDiamond candidate = new StaticsLotteryDiamond(authority, address(cutFacet));
