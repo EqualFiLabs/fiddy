@@ -92,7 +92,23 @@ contract InvalidScheduleRegistry is IEqualFiDrandRegistry {
     }
 }
 
-contract LifecycleEndpoint { }
+contract LifecycleEndpoint {
+    function bootstrapFinalized() external pure returns (bool) {
+        return true;
+    }
+
+    function totalEffectiveWeight() external pure returns (uint256) {
+        return 1;
+    }
+
+    function isRewardAsset(address) external pure returns (bool) {
+        return true;
+    }
+
+    function rewardAssetEnabled(address) external pure returns (bool) {
+        return true;
+    }
+}
 
 contract LifecycleInitializer {
     function initialize() external {
