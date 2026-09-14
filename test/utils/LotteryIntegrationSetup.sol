@@ -102,11 +102,17 @@ contract IntegrationEndpoint {
     bool public bootstrapFinalized = true;
     uint256 public totalEffectiveWeight = 1;
     bool public rejectRewards;
+    bool public rejectLiabilityCapacity;
+    bool public rejectIndexCapacity;
     mapping(address asset => bool registered) internal registeredAssets;
     mapping(address asset => bool enabled) internal enabledAssets;
     mapping(address asset => uint256 amount) public totalAdded;
 
     error RewardsRejected();
+    error RewardLiabilityLimitExceeded(
+        address asset, uint256 currentLiability, uint256 amount, uint256 limit
+    );
+    error RewardIndexCapacityExceeded(address asset);
 
     function setBootstrapFinalized(bool finalized) external {
         bootstrapFinalized = finalized;
@@ -125,6 +131,14 @@ contract IntegrationEndpoint {
         rejectRewards = rejected;
     }
 
+    function setRejectLiabilityCapacity(bool rejected) external {
+        rejectLiabilityCapacity = rejected;
+    }
+
+    function setRejectIndexCapacity(bool rejected) external {
+        rejectIndexCapacity = rejected;
+    }
+
     function isRewardAsset(address asset) external view returns (bool) {
         return registeredAssets[asset];
     }
@@ -135,6 +149,10 @@ contract IntegrationEndpoint {
 
     function addRewards(address asset, uint256 amount) external {
         if (rejectRewards) revert RewardsRejected();
+        if (rejectLiabilityCapacity) {
+            revert RewardLiabilityLimitExceeded(asset, type(uint96).max, amount, type(uint96).max);
+        }
+        if (rejectIndexCapacity) revert RewardIndexCapacityExceeded(asset);
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         totalAdded[asset] += amount;
     }
