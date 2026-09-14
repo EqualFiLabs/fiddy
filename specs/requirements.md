@@ -458,6 +458,26 @@ A Round state from which ticket purchases can never resume, including settlement
 11. AN upgrade SHALL NOT erase or redirect previously recorded winner claims, refund liabilities, Pending Operator Revenue, or Treasury accounting.
 12. THE Diamond storage architecture SHALL preserve state compatibility across upgrades while upgradeability remains enabled.
 
+### Requirement 25: Formal Verification of the drand Registry
+
+**User Story:** As a Lottery participant, I want machine-checked evidence for the immutable randomness-verification boundary, so that the Registry cannot accept, misbind, or replace a Quicknet beacon without violating an explicit verified property.
+
+#### Acceptance Criteria
+
+1. BEFORE a production release, THE `EqualFiDrandRegistry` implementation SHALL have a versioned formal-verification package covering the source revision and compiled EVM runtime bytecode intended for deployment; the release gate SHALL confirm that the deployed bytecode matches.
+2. THE formal model SHALL prove the boundary, strict-future minimality, ordering, and overflow behavior of `roundTime` and `firstRoundAfter` for their complete supported input domains.
+3. THE formal model SHALL prove that every newly stored beacon is bound to the compiled Quicknet public key, Quicknet DST, exact encoded Round, and submitted signature point used by verification.
+4. THE formal model SHALL cover all contract-side input validation and representation handling, including supported lengths, compressed-point flags and decompression, uncompressed-point decoding, infinity and field bounds, subgroup-validation calls, message serialization, precompile calldata, and precompile return-data handling.
+5. SUBJECT to the documented EIP-2537 precompile model, THE formal model SHALL prove both that storage is unreachable unless the required BLS pairing verification succeeds and that a valid supported proof is stored when ordinary call preconditions hold.
+6. THE formal model SHALL prove that equivalent valid 48-byte and 96-byte encodings normalize to the same canonical signature point and derive the same Round-bound randomness.
+7. THE formal model SHALL prove first-write immutability: a successfully stored Round's randomness and `postedAt` never change, and any duplicate submission returns `false` without mutating that beacon.
+8. THE formal model SHALL prove that no caller, owner, governance role, proxy path, or alternate entry point can bypass verification or replace a stored beacon.
+9. REQUIRED proof artifacts SHALL pin the Registry source revision, compiler and settings, dependency revisions, formal tool version, specification revision, and verified runtime bytecode hash.
+10. A required proof obligation SHALL NOT be reported as passing when its run times out, returns unknown, is vacuous, relies on an unconstrained success oracle, or depends on an undocumented assumption.
+11. THE proof report SHALL enumerate the trusted computing base and proof exclusions, including the EIP-2537 implementation, cryptographic assumptions, official Quicknet trust anchor, Solidity compiler, and Robinhood Chain execution environment.
+12. Official Quicknet differential vectors and Robinhood runtime validation SHALL test the concrete cryptographic and precompile assumptions that the formal model abstracts; those tests SHALL be reported separately from machine-checked proofs.
+13. THE project SHALL NOT describe the formal package as proving drand network liveness, threshold-operator honesty, cryptographic hardness, compiler correctness, or EIP-2537 client correctness unless those components are separately verified.
+
 ---
 
 ## Explicit V1 Constraints
@@ -481,3 +501,4 @@ A Round state from which ticket purchases can never resume, including settlement
 - Failure of Operator revenue routing cannot block settlement, claims, or refunds.
 - Existing Round configuration cannot be changed retroactively.
 - All tunable economic and operational values are governance-configurable for future Rounds.
+- The immutable drand Registry is a release-critical formal-verification target with an explicit trusted computing base and no unresolved required proof results.

@@ -76,12 +76,26 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 4.4 Add fuzz/property tests for round arithmetic
     - Details: Verify `roundTime(firstRoundAfter(t)) > t` and ordering/boundary properties.
     - _Requirements: 7.3-7.4, 8.3_
+  - [ ] 4.5 Define the Registry formal-verification package
+    - Details: Specify the machine-checked claims, complete-domain expectations, trusted computing base, proof exclusions, and constrained EIP-2537 summaries. Pin the source revision, compiler/settings, dependencies, formal specifications/tools, and runtime bytecode hash in the proof report.
+    - _Requirements: 25.1, 25.9-25.13_
+  - [ ] 4.6 Prove contract-side Quicknet transformations
+    - Details: Prove Round arithmetic, exact Round serialization, public-key and DST binding, compressed-point parsing/decompression, uncompressed decoding, field and infinity rejection, canonical normalization, and equivalent randomness for matching valid 48-byte and 96-byte representations.
+    - _Requirements: 8.1-8.6, 25.2-25.6_
+  - [ ] 4.7 Prove Registry acceptance and cache immutability
+    - Details: Against compiled EVM runtime bytecode, prove verification-success equivalence under constrained EIP-2537 summaries, failure-path non-mutation, first-write immutability, duplicate-call behavior, and absence of a privileged bypass or replacement path.
+    - _Requirements: 8.3-8.6, 25.1, 25.3-25.8_
+  - [ ] 4.8 Validate proof soundness and concrete assumptions
+    - Details: Add vacuity and mutation checks, reject timeout or unknown results for required rules, differentially test official Quicknet intermediate values, and prepare the target-chain EIP-2537 conformance harness executed in Task 20. Keep runtime results separate from formal results.
+    - _Requirements: 23.3-23.4, 25.9-25.13_
 
 - [ ] 5. Checkpoint: shared randomness primitive
   - [ ] 5.1 Run complete registry unit, fuzz, and known-vector suite.
   - [ ] 5.2 Confirm both signature transports remain supported.
-  - [ ] 5.3 Ensure all tests pass before proceeding.
-    - _Requirements: 7, 8, 9, 22, 23_
+  - [ ] 5.3 Run every release-required Registry formal rule with no timeout, unknown, or vacuous result.
+  - [ ] 5.4 Confirm the proof report pins its artifacts and states every assumption and exclusion.
+  - [ ] 5.5 Ensure all tests and proof gates pass before proceeding.
+    - _Requirements: 7, 8, 9, 22, 23, 25_
 
 - [ ] 6. Build the Lottery Diamond foundation
   - [ ] 6.1 Create the Lottery project structure
@@ -276,33 +290,37 @@ All economic and operational configuration affects future Rounds only. Governanc
     - _Requirements: 2, 3, 13, 22_
 
 - [ ] 18. Add formal verification targets
-  - [ ] 18.1 Add Halmos proof for `cutsDisabled` irreversibility.
+  - [ ] 18.1 Prove Lottery commitment to immutable Registry randomness.
+    - Details: Prove a sold-out Round commits exactly once to the configured strictly-future drand Round and that neither upgrades nor ordinary lifecycle calls can change its target or substitute another randomness source.
+    - _Requirements: 7-9, 16, 24.10, 25_
+  - [ ] 18.2 Add Halmos proof for `cutsDisabled` irreversibility.
     - _Requirements: 24.5-24.8_
-  - [ ] 18.2 Add bounded revenue-conservation proof harness.
+  - [ ] 18.3 Add bounded revenue-conservation proof harness.
     - _Requirements: 10, 11, 19_
-  - [ ] 18.3 Add bounded per-token solvency and cross-token isolation proof harness.
+  - [ ] 18.4 Add bounded per-token solvency and cross-token isolation proof harness.
     - _Requirements: 14, 19, 20_
-  - [ ] 18.4 Add claim non-repeatability proof.
+  - [ ] 18.5 Add claim non-repeatability proof.
     - _Requirements: 12, 15, 19, 20_
-  - [ ] 18.5 Add Operator flush atomicity proof or invariant.
+  - [ ] 18.6 Add Operator flush atomicity proof or invariant.
     - _Requirements: 13, 19, 20_
-  - [ ] 18.6 Document formal-model bounds explicitly.
-    - _Requirements: 19, 20, 24_
+  - [ ] 18.7 Document formal-model bounds explicitly.
+    - _Requirements: 19, 20, 24, 25_
 
 - [ ] 19. Checkpoint: security release gate
   - [ ] 19.1 Run formatting, lint, build, unit tests, fuzzing, and stateful invariants.
-  - [ ] 19.2 Run formal harnesses.
+  - [ ] 19.2 Run the required Registry proof suite and Lottery formal harnesses; archive non-vacuous results and fail the gate on any required timeout or unknown.
   - [ ] 19.3 Review all external-call paths for CEI and liability preservation.
   - [ ] 19.4 Review every governance function against the post-finalization trust model.
   - [ ] 19.5 Ensure all security gates pass.
-    - _Requirements: 1-24_
+    - _Requirements: 1-25_
 
 - [ ] 20. Deploy and validate `EqualFiDrandRegistry` on Robinhood Testnet
   - [ ] 20.1 Add chain-guarded testnet deployment script.
   - [ ] 20.2 Deploy registry and record address, code hash, compiler version, dependency commits, and transaction.
   - [ ] 20.3 Verify a real live future Quicknet Round onchain.
   - [ ] 20.4 Where practical, demonstrate equivalent compressed and uncompressed representations against real Quicknet data.
-    - _Requirements: 8, 23.1-23.4_
+  - [ ] 20.5 Record the deployed runtime bytecode hash and reconcile Robinhood EIP-2537 results with the proof package's concrete-assumption vectors.
+    - _Requirements: 8, 23.1-23.4, 25.9-25.12_
 
 - [ ] 21. Deploy Lottery Diamond to Robinhood Testnet
   - [ ] 21.1 Add `LotteryInit`
@@ -338,13 +356,14 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 23.1 Add `docs/architecture.md` for Diamond trust boundary, lifecycle, randomness, accounting, Operator integration, and progressive immutability.
     - _Requirements: 21, 22, 24_
   - [ ] 23.2 Add `docs/randomness.md` for Quicknet trust model, target selection, no fallback, 48/96 support, normalization, and domain separation.
-    - _Requirements: 7-9, 16, 22_
+    - Details: Include the exact formal claim, EIP-2537 model, trusted computing base, proof exclusions, pinned artifacts, and distinction between formal, differential, fork, and live evidence.
+    - _Requirements: 7-9, 16, 22, 25_
   - [ ] 23.3 Add `docs/accounting.md` for per-token conservation and isolation, liabilities, Treasury, refunds, direct same-token Operator routing, and surplus.
     - _Requirements: 10-15, 19-20_
   - [ ] 23.4 Add `docs/governance.md` distinguishing Diamond upgrades, parameter governance, guardian powers, code finalization, and optional governance renunciation.
     - _Requirements: 1-3, 17-18, 24_
   - [ ] 23.5 Produce audit scope listing contracts, dependencies, invariants, privileged roles, limitations, tests, testnet addresses, and formal-verification bounds.
-    - _Requirements: 1-24_
+    - _Requirements: 1-25_
 
 - [ ] 24. Final checkpoint
   - [ ] 24.1 Run all registry and Lottery tests from a clean checkout.
@@ -355,5 +374,6 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 24.6 Verify settlement contains no dependency on Winner, Treasury, Payment Token, or Operator Router transfer success.
   - [ ] 24.7 Verify all ERC-20 ingress and egress paths require exact deltas and cannot cross-subsidize another token.
   - [ ] 24.8 Verify Diamond finalization is irreversible.
-  - [ ] 24.9 Ensure all tests pass and implementation is ready for audit/release.
-    - _Requirements: 1-24_
+  - [ ] 24.9 Verify the Registry proof package matches deployed runtime bytecode, discloses its trusted computing base, and has no unresolved required rule.
+  - [ ] 24.10 Ensure all tests and proof gates pass and implementation is ready for audit/release.
+    - _Requirements: 1-25_

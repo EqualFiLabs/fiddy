@@ -902,7 +902,38 @@ The registry does not need to permanently store the raw signature. Instead, an e
 
 If a valid Round has already been stored, `postSig(round, anything)` returns `false` without re-verifying the proof. First successful verification returns `true`.
 
-Validates Requirements 7, 8, 9, 22 and 23.
+## Formal Verification Boundary
+
+The Registry is the release-critical formal-verification boundary for randomness acceptance. The target machine-checked claim is:
+
+> Assuming the documented EIP-2537 and cryptographic model, every beacon newly stored by `EqualFiDrandRegistry` corresponds to a valid Quicknet signature for exactly that Round, produces one canonical Round-bound randomness value, and can never be replaced.
+
+The formal package SHALL cover the compiled Registry EVM runtime bytecode and all contract-side logic that can affect that claim. This includes:
+
+- complete-domain Quicknet Round arithmetic, including strict-future minimality and overflow behavior
+- exact `uint64` Round serialization, Quicknet DST selection, and compiled public-key binding
+- compressed G1 flag parsing and decompression, uncompressed G1 decoding, field bounds, infinity rejection, and representation normalization
+- hash-to-curve and EIP-2537 call wiring, including calldata construction, success handling, exact return-data validation, and rejection paths
+- storage reachability only after a modeled successful pairing check
+- acceptance of valid supported proofs under the model
+- equality of canonical randomness for equivalent valid 48-byte and 96-byte signature representations
+- first-write immutability, duplicate-call non-mutation, and absence of any privileged verification bypass or replacement path
+
+The EIP-2537 elliptic-curve and pairing implementation MAY be represented by formal summaries rather than reproved inside the Registry package. Any such summary SHALL constrain success to the specified curve, subgroup, operands, and pairing relation; it SHALL NOT be an unconstrained oracle that can manufacture a successful verification. Contract-side decoding, serialization, normalization, and precompile-call handling remain inside the proof scope.
+
+The trusted computing base and explicit proof exclusions are:
+
+- correctness of the EIP-2537 implementation in the target Robinhood Chain execution client
+- standard BLS12-381, SHA-256, Keccak-256, and hash-to-curve security assumptions
+- authenticity of the pinned official Quicknet public key, DST, genesis time, and period
+- correctness of the pinned Solidity compiler and target-chain EVM semantics
+- drand threshold-operator honesty and network liveness
+
+Official Quicknet intermediate and end-to-end vectors SHALL differentially test parsing, serialization, hash-to-curve inputs, point normalization, pairing results, and final randomness. Robinhood fork or testnet execution SHALL validate the concrete EIP-2537 behavior. These checks connect abstracted assumptions to the target runtime, but they are not substitutes for the formal proofs.
+
+Each proof report SHALL pin the source revision, compiler settings, dependency revisions, formal specification and tool versions, and compiled runtime bytecode hash. Release-required properties must finish with a non-vacuous proved result; timeout, unknown, or assumptions broader than this section are release failures. Reducing or removing custom 48-byte decompression requires a separately accepted interface/design change rather than weakening its proof obligation.
+
+Validates Requirements 7, 8, 9, 22, 23 and 25.
 
 # Data Models
 
@@ -1363,6 +1394,8 @@ ERC-20 and `OperatorFeeRouter` failures are allowed to bubble so claims, refunds
 14. **Integration Version Preservation:** Changing current integrations cannot rewrite an existing Round's integration version or pending revenue bucket. Validates Requirements 3, 11, 13 and 22.
 15. **Pause Cannot Censor Exit:** Settlement, expiration, winner/refund/finalizer claims, and Operator flushes remain callable while paused when ordinary preconditions are met. Validates Requirements 17 and 18.
 16. **Diamond Finalization Is Irreversible:** Once `cutsDisabled == true`, all future Diamond cuts revert and no transition back exists. Validates Requirement 24.
+17. **Registry Acceptance Soundness:** Subject to the documented EIP-2537 model, every newly stored Registry beacon verified the official Quicknet signature for its exact Round and all rejected or malformed inputs leave storage unchanged. Validates Requirements 8 and 25.
+18. **Registry First-Write Immutability:** Once a Registry beacon is stored, its canonical randomness and `postedAt` never change and no caller has a replacement path. Validates Requirements 8, 9 and 25.
 
 # Testing Strategy
 
@@ -1418,6 +1451,8 @@ test/EqualFiDrandRegistry.t.sol
 
 Tests cover real Quicknet vectors, valid 48-byte and 96-byte signatures, identical normalized randomness, wrong round/signature, malformed points, wrong lengths, duplicate posting, round-time boundaries, firstRoundAfter boundaries, and postedAt behavior.
 
+Differential tests SHALL assert intermediate contract-side values where observable, including encoded Round messages, parsed or decompressed points, canonical marshaling, precompile inputs and outputs, and final Round-bound randomness. These tests validate concrete Quicknet and Robinhood EIP-2537 compatibility; the proof report SHALL keep them distinct from formal results.
+
 ## Robinhood Testnet Integration
 
 A release-gate deployment SHALL execute the actual production path:
@@ -1440,7 +1475,24 @@ A second test SHALL exercise an unsold expired Round with full refunds. A third 
 
 ## Formal / Property Verification Targets
 
-Strong candidates for Halmos or Certora:
+The Registry proof package is required for release. Use a compiled-bytecode verifier for state-transition and acceptance properties, with symbolic or theorem-prover support for pure arithmetic, parsing, serialization, decompression, and representation-equivalence lemmas where that produces a smaller auditable model.
+
+Required Registry targets:
+
+```text
+roundTime and firstRoundAfter complete-domain correctness
+strict-future target minimality and overflow safety
+Quicknet key, DST, message, and Round binding
+malformed encoding, point, precompile-failure, and return-data rejection
+verification-success equivalence under constrained EIP-2537 summaries
+48-byte and 96-byte canonical-point/randomness equivalence
+first-write beacon immutability and duplicate-call non-mutation
+absence of privileged verification bypass or replacement
+```
+
+Every EIP-2537 summary SHALL state its mathematical preconditions and postconditions. The verification suite SHALL include sanity or mutation checks sufficient to detect vacuous properties and SHALL preserve raw results for every release-required rule. The proof report must identify model bounds; Registry arithmetic and cache-state claims are expected to be complete-domain unless an accepted design revision explicitly narrows them.
+
+Lottery and Diamond targets for Halmos or Certora:
 
 ```text
 per-round revenue conservation
@@ -1462,7 +1514,8 @@ Diamond cutsDisabled irreversibility
 | Round opening | 3, 4, 18 |
 | Ticket purchases/ranges | 5, 6, 19, 20 |
 | Sellout commitment | 7, 8, 16 |
-| Shared drand registry | 7, 8, 9, 22, 23 |
+| Shared drand registry | 7, 8, 9, 22, 23, 25 |
+| Formal verification | 7, 8, 9, 24, 25 |
 | Settlement | 9, 10, 11, 16, 18, 19 |
 | Winner/finalizer claims | 10, 12, 18, 19, 20 |
 | Expiry/refunds | 15, 17, 18, 19, 20 |
