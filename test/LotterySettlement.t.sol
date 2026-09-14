@@ -4,7 +4,13 @@ pragma solidity 0.8.30;
 import { IEqualFiDrandRegistry } from "../src/interfaces/IEqualFiDrandRegistry.sol";
 import { ISettlement } from "../src/interfaces/ISettlement.sol";
 import { Errors } from "../src/shared/Errors.sol";
-import { AssetAccounting, IntegrationConfig, Round, RoundStatus } from "../src/shared/Types.sol";
+import {
+    AssetAccounting,
+    IntegrationConfig,
+    LotteryConfig,
+    Round,
+    RoundStatus
+} from "../src/shared/Types.sol";
 import {
     ConfiguredDrandRegistry,
     LotteryIntegrationSetup
@@ -147,6 +153,9 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
     }
 
     function test_RejectsOpenExpiredAndAlreadySettledRounds() public {
+        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotFound.selector, 999));
+        settlement.settleRound(999, "");
+
         vm.prank(alice);
         uint256 openRoundId = lottery.openRound(1, 1);
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, openRoundId));
@@ -240,5 +249,82 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         assertEq(accounting.finalizerLiability, 1);
         assertEq(accounting.treasuryAvailable, 0);
         assertEq(stateView.finalizerCredit(address(tokenA), finalizer), 1);
+    }
+
+    function test_SettlesZeroWinnerAndOperatorSharesEntirelyToTreasury() public {
+        LotteryConfig memory config = _config(address(tokenA), 10, 10, 10, 1 days, 0);
+        config.winnerBps = 0;
+        config.operatorProtocolBps = 0;
+        config.finalizerTip = 0;
+        _settleWithConfig(config, keccak256("zero shares"));
+
+        AssetAccounting memory accounting = stateView.assetAccounting(address(tokenA));
+        assertEq(accounting.winnerLiability, 0);
+        assertEq(accounting.pendingOperatorRevenueTotal, 0);
+        assertEq(accounting.treasuryAvailable, 100);
+        assertEq(accounting.finalizerLiability, 0);
+    }
+
+    function test_SettlesFullWinnerShareWithoutProtocolLiabilities() public {
+        LotteryConfig memory config = _config(address(tokenA), 10, 10, 10, 1 days, 0);
+        config.winnerBps = 10_000;
+        config.operatorProtocolBps = 10_000;
+        _settleWithConfig(config, keccak256("full winner"));
+
+        AssetAccounting memory accounting = stateView.assetAccounting(address(tokenA));
+        assertEq(accounting.winnerLiability, 100);
+        assertEq(accounting.pendingOperatorRevenueTotal, 0);
+        assertEq(accounting.treasuryAvailable, 0);
+        assertEq(accounting.finalizerLiability, 0);
+    }
+
+    function test_SettlesFullOperatorProtocolShareWithoutTreasuryOrTip() public {
+        LotteryConfig memory config = _config(address(tokenA), 10, 10, 10, 1 days, 0);
+        config.winnerBps = 5000;
+        config.operatorProtocolBps = 10_000;
+        _settleWithConfig(config, keccak256("full operator"));
+
+        AssetAccounting memory accounting = stateView.assetAccounting(address(tokenA));
+        assertEq(accounting.winnerLiability, 50);
+        assertEq(accounting.pendingOperatorRevenueTotal, 50);
+        assertEq(accounting.treasuryAvailable, 0);
+        assertEq(accounting.finalizerLiability, 0);
+        assertEq(stateView.pendingOperatorRevenue(1, address(tokenA)), 50);
+    }
+
+    function test_RoundsSharesDownAndAssignsRemainderToTreasury() public {
+        LotteryConfig memory config = _config(address(tokenA), 1, 7, 7, 1 days, 0);
+        config.winnerBps = 3333;
+        config.operatorProtocolBps = 3333;
+        config.finalizerTip = 1;
+        _settleWithConfig(config, keccak256("rounding"));
+
+        AssetAccounting memory accounting = stateView.assetAccounting(address(tokenA));
+        assertEq(accounting.winnerLiability, 2);
+        assertEq(accounting.pendingOperatorRevenueTotal, 1);
+        assertEq(accounting.treasuryAvailable, 3);
+        assertEq(accounting.finalizerLiability, 1);
+        assertEq(
+            accounting.winnerLiability + accounting.pendingOperatorRevenueTotal
+                + accounting.treasuryAvailable + accounting.finalizerLiability,
+            7
+        );
+    }
+
+    function _settleWithConfig(LotteryConfig memory config, bytes32 randomness)
+        private
+        returns (uint256 roundId)
+    {
+        vm.startPrank(authority);
+        uint64 version = governance.createLotteryConfig(config);
+        governance.setLotteryConfigEnabled(version, true);
+        vm.stopPrank();
+
+        vm.prank(alice);
+        roundId = lottery.openRound(version, config.ticketCount);
+        Round memory soldOut = stateView.round(roundId);
+        registry.cache(soldOut.drandRound, randomness, soldOut.selloutAt + 1);
+        vm.prank(finalizer);
+        settlement.settleRound(roundId, "");
     }
 }

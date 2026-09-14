@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import { Errors } from "../src/shared/Errors.sol";
+import { IRevenue } from "../src/interfaces/IRevenue.sol";
 import { AssetAccounting, IntegrationConfig, LotteryConfig, Round } from "../src/shared/Types.sol";
 import {
     IntegrationEndpoint,
@@ -29,6 +30,28 @@ contract RevenueSenderFeeToken is IntegrationToken {
 contract RejectingTreasury {
     receive() external payable {
         revert("native rejected");
+    }
+}
+
+contract ReentrantRevenueRouter {
+    function bootstrapFinalized() external pure returns (bool) {
+        return true;
+    }
+
+    function totalEffectiveWeight() external pure returns (uint256) {
+        return 1;
+    }
+
+    function isRewardAsset(address) external pure returns (bool) {
+        return true;
+    }
+
+    function rewardAssetEnabled(address) external pure returns (bool) {
+        return true;
+    }
+
+    function addRewards(address asset, uint256 amount) external {
+        IRevenue(msg.sender).flushOperatorRevenue(2, asset, amount);
     }
 }
 
@@ -111,6 +134,27 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         vm.prank(alice);
         uint256 roundId = lottery.openRound(version, 1);
         assertEq(stateView.round(roundId).config.operatorProtocolBps, 0);
+    }
+
+    function test_OpeningRejectsEveryUnavailableRouterState() public {
+        router.setBootstrapFinalized(false);
+        _expectUnavailableOpening();
+
+        router.setBootstrapFinalized(true);
+        router.setTotalEffectiveWeight(0);
+        _expectUnavailableOpening();
+
+        router.setTotalEffectiveWeight(1);
+        router.setAsset(address(tokenA), false, false);
+        _expectUnavailableOpening();
+
+        router.setAsset(address(tokenA), true, false);
+        _expectUnavailableOpening();
+
+        router.setAsset(address(tokenA), true, true);
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(1, 1);
+        assertEq(stateView.round(roundId).soldTickets, 1);
     }
 
     function test_HistoricalRevenueUsesSnapshottedRouterAndToken() public {
@@ -201,6 +245,66 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         assertEq(token.balanceOf(address(router)), 0);
         assertEq(router.totalAdded(address(token)), 0);
         assertEq(token.allowance(address(diamond), address(router)), 0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.InexactTokenTransfer.selector, address(token), 7, 8, 7)
+        );
+        revenue.flushTreasury(address(token), 7);
+        assertEq(stateView.assetAccounting(address(token)).treasuryAvailable, 7);
+        assertEq(token.balanceOf(treasury), 0);
+    }
+
+    function test_RouterCapacityFailuresPreserveRevenueUntilRetry() public {
+        _settleRoundA();
+        router.setRejectLiabilityCapacity(true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IntegrationEndpoint.RewardLiabilityLimitExceeded.selector,
+                address(tokenA),
+                type(uint96).max,
+                10,
+                type(uint96).max
+            )
+        );
+        revenue.flushOperatorRevenue(1, address(tokenA), 10);
+        _assertPendingOperatorRevenue();
+
+        router.setRejectLiabilityCapacity(false);
+        router.setRejectIndexCapacity(true);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IntegrationEndpoint.RewardIndexCapacityExceeded.selector, address(tokenA)
+            )
+        );
+        revenue.flushOperatorRevenue(1, address(tokenA), 10);
+        _assertPendingOperatorRevenue();
+
+        router.setRejectIndexCapacity(false);
+        assertEq(revenue.flushOperatorRevenue(1, address(tokenA), 10), 10);
+        assertEq(stateView.pendingOperatorRevenue(1, address(tokenA)), 0);
+        assertEq(tokenA.allowance(address(diamond), address(router)), 0);
+    }
+
+    function test_ReentrantRouterCannotConsumeOperatorRevenue() public {
+        ReentrantRevenueRouter reentrantRouter = new ReentrantRevenueRouter();
+        vm.prank(authority);
+        governance.setIntegrationConfig(
+            IntegrationConfig(address(registry), address(reentrantRouter))
+        );
+        uint256 roundId = _sellOutRoundA();
+        Round memory soldOut = stateView.round(roundId);
+        registry.cache(soldOut.drandRound, keccak256("reentrant router"), soldOut.selloutAt + 1);
+        settlement.settleRound(roundId, "");
+
+        vm.expectRevert(Errors.Reentrancy.selector);
+        revenue.flushOperatorRevenue(2, address(tokenA), 10);
+
+        assertEq(stateView.pendingOperatorRevenue(2, address(tokenA)), 10);
+        assertEq(stateView.assetAccounting(address(tokenA)).pendingOperatorRevenueTotal, 10);
+        assertEq(tokenA.balanceOf(address(diamond)), 100);
+        assertEq(tokenA.balanceOf(address(reentrantRouter)), 0);
+        assertEq(tokenA.allowance(address(diamond), address(reentrantRouter)), 0);
     }
 
     function test_ForcedNativeSurplusFlushesOnlyToTreasury() public {
@@ -246,5 +350,23 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         registry.cache(soldOut.drandRound, keccak256("revenue randomness"), soldOut.selloutAt + 1);
         vm.prank(finalizer);
         settlement.settleRound(roundId, "");
+    }
+
+    function _expectUnavailableOpening() private {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.OperatorRouterUnavailable.selector, address(router), address(tokenA)
+            )
+        );
+        vm.prank(alice);
+        lottery.openRound(1, 1);
+    }
+
+    function _assertPendingOperatorRevenue() private view {
+        assertEq(stateView.pendingOperatorRevenue(1, address(tokenA)), 10);
+        assertEq(stateView.assetAccounting(address(tokenA)).pendingOperatorRevenueTotal, 10);
+        assertEq(tokenA.balanceOf(address(router)), 0);
+        assertEq(router.totalAdded(address(tokenA)), 0);
+        assertEq(tokenA.allowance(address(diamond), address(router)), 0);
     }
 }
