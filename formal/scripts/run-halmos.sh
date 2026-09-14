@@ -8,6 +8,7 @@ set +e
 halmos \
   --match-contract '^(LotteryCommitmentHalmosTest|LotterySettlementHalmosTest|LotteryClaimsHalmosTest|LotteryRevenueHalmosTest|LotteryCutsHalmosTest)$' \
   --solver z3 \
+  --storage-layout generic \
   --solver-timeout-branching 0 \
   --solver-timeout-assertion 0 \
   --panic-error-codes '*' \

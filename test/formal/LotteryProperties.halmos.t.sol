@@ -28,8 +28,8 @@ contract LotteryCommitmentHalmosTest is Test {
         FormalToken token = new FormalToken("COMMIT");
         FormalRegistry registry = new FormalRegistry();
         FormalRouter router = new FormalRouter();
-        LotteryCommitmentHarness lottery = new LotteryCommitmentHarness(token, registry, router);
-        lottery.setRandomnessDelay(delay);
+        LotteryCommitmentHarness lottery =
+            new LotteryCommitmentHarness(token, registry, router, delay);
         token.mint(address(this), 1);
         token.approve(address(lottery), 1);
 
@@ -66,8 +66,9 @@ contract LotterySettlementHalmosTest is Test {
         FormalToken paymentToken = new FormalToken("PRIMARY");
         FormalToken isolatedToken = new FormalToken("ISOLATED");
         FormalRegistry registry = new FormalRegistry();
-        LotterySettlementHarness settlement = new LotterySettlementHarness(registry);
-        settlement.seedSettlement(paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip);
+        LotterySettlementHarness settlement = new LotterySettlementHarness(
+            registry, paymentToken, isolatedToken, gross, winnerBps, operatorBps, tip
+        );
         registry.cache(2, keccak256("formal randomness"), 2);
 
         settlement.settleRound(1, "");
@@ -102,8 +103,7 @@ contract LotteryClaimsHalmosTest is Test {
     function check_winnerClaimCannotRepeat(uint256 rawAmount) public {
         uint96 amount = uint96(bound(rawAmount, 1, type(uint96).max));
         FormalToken token = new FormalToken("WINNER");
-        LotteryClaimsHarness claims = new LotteryClaimsHarness();
-        claims.seedWinner(token, address(this), amount);
+        LotteryClaimsHarness claims = new LotteryClaimsHarness(token, address(this), amount, false);
 
         assert(claims.claimWinner(1, RECEIVER) == amount);
         (bool repeated,) = address(claims)
@@ -118,8 +118,7 @@ contract LotteryClaimsHalmosTest is Test {
     function check_refundClaimCannotRepeat(uint256 rawAmount) public {
         uint96 amount = uint96(bound(rawAmount, 1, type(uint96).max));
         FormalToken token = new FormalToken("REFUND");
-        LotteryClaimsHarness claims = new LotteryClaimsHarness();
-        claims.seedRefund(token, address(this), amount);
+        LotteryClaimsHarness claims = new LotteryClaimsHarness(token, address(this), amount, true);
 
         assert(claims.claimRefund(2, RECEIVER) == amount);
         (bool repeated,) = address(claims)
@@ -143,9 +142,9 @@ contract LotteryRevenueHalmosTest is Test {
         FormalToken paymentToken = new FormalToken("REVENUE");
         FormalToken isolatedToken = new FormalToken("OTHER");
         FormalRouter router = new FormalRouter();
-        LotteryRevenueHarness revenue = new LotteryRevenueHarness(router);
-        revenue.seedOperatorRevenue(paymentToken, amount);
-        revenue.seedIsolatedToken(isolatedToken, isolatedAmount);
+        LotteryRevenueHarness revenue = new LotteryRevenueHarness(
+            router, paymentToken, isolatedToken, amount, isolatedAmount
+        );
         router.setRejectContribution(rejectContribution);
 
         (bool succeeded,) = address(revenue)

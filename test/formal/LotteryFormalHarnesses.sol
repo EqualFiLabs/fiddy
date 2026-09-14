@@ -100,7 +100,7 @@ contract FormalRouter is IOperatorFeeRouter {
 }
 
 contract LotteryCommitmentHarness is LotteryFacet {
-    constructor(FormalToken token, FormalRegistry registry, FormalRouter router) {
+    constructor(FormalToken token, FormalRegistry registry, FormalRouter router, uint32 delay) {
         LibReentrancy.initialize();
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         gs.nextConfigVersion = 1;
@@ -111,7 +111,7 @@ contract LotteryCommitmentHarness is LotteryFacet {
             ticketPrice: 1,
             ticketCount: 1,
             salesDuration: 1 days,
-            randomnessDelay: 0,
+            randomnessDelay: delay,
             maxTicketsPerPurchase: 1,
             winnerBps: 10_000,
             operatorProtocolBps: 0,
@@ -134,22 +134,21 @@ contract LotteryCommitmentHarness is LotteryFacet {
 }
 
 contract LotterySettlementHarness is SettlementFacet {
-    constructor(FormalRegistry registry) {
-        LibReentrancy.initialize();
-        LibLotteryStorage.IntegrationStorage storage integrations =
-            LibLotteryStorage.integrationStorage();
-        integrations.currentVersion = 1;
-        integrations.integrations[1].drandRegistry = address(registry);
-    }
-
-    function seedSettlement(
+    constructor(
+        FormalRegistry registry,
         FormalToken paymentToken,
         FormalToken isolatedToken,
         uint96 gross,
         uint16 winnerBps,
         uint16 operatorBps,
         uint96 finalizerTip
-    ) external {
+    ) {
+        LibReentrancy.initialize();
+        LibLotteryStorage.IntegrationStorage storage integrations =
+            LibLotteryStorage.integrationStorage();
+        integrations.currentVersion = 1;
+        integrations.integrations[1].drandRegistry = address(registry);
+
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         Round storage round = gs.rounds[1];
         round.config.paymentToken = address(paymentToken);
@@ -192,28 +191,24 @@ contract LotterySettlementHarness is SettlementFacet {
 }
 
 contract LotteryClaimsHarness is ClaimsFacet {
-    constructor() {
+    constructor(FormalToken token, address claimant, uint96 amount, bool refund) {
         LibReentrancy.initialize();
-    }
-
-    function seedWinner(FormalToken token, address winner, uint96 amount) external {
-        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
-        round.config.paymentToken = address(token);
-        round.status = RoundStatus.Settled;
-        round.winner = winner;
-        round.winnerClaimable = amount;
-        LibLotteryStorage.accountingStorage().assetAccounting[address(token)].winnerLiability =
-        amount;
-        token.mint(address(this), amount);
-    }
-
-    function seedRefund(FormalToken token, address claimant, uint96 amount) external {
-        Round storage round = LibLotteryStorage.gameStorage().rounds[2];
-        round.config.paymentToken = address(token);
-        round.status = RoundStatus.Expired;
-        LibLotteryStorage.gameStorage().refundCredit[2][claimant] = amount;
-        LibLotteryStorage.accountingStorage().assetAccounting[address(token)].refundLiability =
-        amount;
+        if (refund) {
+            Round storage round = LibLotteryStorage.gameStorage().rounds[2];
+            round.config.paymentToken = address(token);
+            round.status = RoundStatus.Expired;
+            LibLotteryStorage.gameStorage().refundCredit[2][claimant] = amount;
+            LibLotteryStorage.accountingStorage().assetAccounting[address(token)].refundLiability =
+                amount;
+        } else {
+            Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+            round.config.paymentToken = address(token);
+            round.status = RoundStatus.Settled;
+            round.winner = claimant;
+            round.winnerClaimable = amount;
+            LibLotteryStorage.accountingStorage().assetAccounting[address(token)].winnerLiability =
+                amount;
+        }
         token.mint(address(this), amount);
     }
 
@@ -231,28 +226,29 @@ contract LotteryClaimsHarness is ClaimsFacet {
 }
 
 contract LotteryRevenueHarness is RevenueFacet {
-    constructor(FormalRouter router) {
+    constructor(
+        FormalRouter router,
+        FormalToken paymentToken,
+        FormalToken isolatedToken,
+        uint96 amount,
+        uint96 isolatedAmount
+    ) {
         LibReentrancy.initialize();
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
         integrations.currentVersion = 1;
         integrations.integrations[1].operatorFeeRouter = address(router);
-    }
 
-    function seedOperatorRevenue(FormalToken token, uint96 amount) external {
         LibLotteryStorage.AccountingStorage storage accountingStorage =
             LibLotteryStorage.accountingStorage();
-        accountingStorage.pendingOperatorRevenue[1][address(token)] = amount;
-        accountingStorage.assetAccounting[address(token)].pendingOperatorRevenueTotal = amount;
-        token.mint(address(this), amount);
-    }
-
-    function seedIsolatedToken(FormalToken token, uint96 amount) external {
-        LibLotteryStorage.AccountingStorage storage accountingStorage =
-            LibLotteryStorage.accountingStorage();
-        accountingStorage.pendingOperatorRevenue[1][address(token)] = amount;
-        accountingStorage.assetAccounting[address(token)].pendingOperatorRevenueTotal = amount;
-        token.mint(address(this), amount);
+        accountingStorage.pendingOperatorRevenue[1][address(paymentToken)] = amount;
+        accountingStorage.assetAccounting[address(paymentToken)].pendingOperatorRevenueTotal =
+        amount;
+        accountingStorage.pendingOperatorRevenue[1][address(isolatedToken)] = isolatedAmount;
+        accountingStorage.assetAccounting[address(isolatedToken)].pendingOperatorRevenueTotal =
+        isolatedAmount;
+        paymentToken.mint(address(this), amount);
+        isolatedToken.mint(address(this), isolatedAmount);
     }
 
     function pendingOperator(address asset) external view returns (uint256) {
