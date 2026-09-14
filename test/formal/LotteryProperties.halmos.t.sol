@@ -59,15 +59,14 @@ contract LotteryCommitmentHalmosTest is Test {
 
 contract LotterySettlementHalmosTest is Test {
     function check_settlementConservesRevenue(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 gross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 tip
     ) public {
-        uint64 gross = uint64(bound(rawGross, 1, type(uint64).max));
+        gross = uint64(bound(gross, 1, type(uint64).max));
         uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
         uint16 operatorBps = uint16(bound(rawOperatorBps, 0, 10_000));
-        uint64 tip = uint64(bound(rawTip, 0, type(uint64).max));
         LotterySettlementHarness settlement = new LotterySettlementHarness();
         AllocationObservation memory observed =
             settlement.executeAllocation(gross, winnerBps, operatorBps, tip);
@@ -77,10 +76,10 @@ contract LotterySettlementHalmosTest is Test {
     }
 
     function check_settlementPreservesPaymentTokenSolvency(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 rawGross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 rawTip
     ) public {
         (uint64 gross, SettlementObservation memory observed) =
             _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
@@ -91,10 +90,10 @@ contract LotterySettlementHalmosTest is Test {
     }
 
     function check_settlementRecordsOperatorAndFinalizerLiabilities(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 rawGross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 rawTip
     ) public {
         (, SettlementObservation memory observed) =
             _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
@@ -104,10 +103,10 @@ contract LotterySettlementHalmosTest is Test {
     }
 
     function check_settlementDoesNotMutateIsolatedToken(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 rawGross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 rawTip
     ) public {
         (, SettlementObservation memory observed) =
             _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
@@ -116,10 +115,10 @@ contract LotterySettlementHalmosTest is Test {
     }
 
     function check_settlementRecordsTerminalStatus(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 rawGross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 rawTip
     ) public {
         (, SettlementObservation memory observed) =
             _executeSettlement(rawGross, rawWinnerBps, rawOperatorBps, rawTip);
@@ -127,10 +126,10 @@ contract LotterySettlementHalmosTest is Test {
     }
 
     function _executeSettlement(
-        uint256 rawGross,
-        uint256 rawWinnerBps,
-        uint256 rawOperatorBps,
-        uint256 rawTip
+        uint64 rawGross,
+        uint16 rawWinnerBps,
+        uint16 rawOperatorBps,
+        uint64 rawTip
     ) private returns (uint64 gross, SettlementObservation memory observed) {
         gross = uint64(bound(rawGross, 1, type(uint64).max));
         uint16 winnerBps = uint16(bound(rawWinnerBps, 0, 10_000));
