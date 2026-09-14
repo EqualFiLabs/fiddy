@@ -17,13 +17,7 @@ import { ISettlement } from "../../src/interfaces/ISettlement.sol";
 import { LibLotteryStorage } from "../../src/libraries/LibLotteryStorage.sol";
 import { LibReentrancy } from "../../src/libraries/LibReentrancy.sol";
 import { LibTicketRanges } from "../../src/libraries/LibTicketRanges.sol";
-import {
-    AssetAccounting,
-    IntegrationConfig,
-    Round,
-    RoundConfigSnapshot,
-    RoundStatus
-} from "../../src/shared/Types.sol";
+import { AssetAccounting, IntegrationConfig, Round, RoundStatus } from "../../src/shared/Types.sol";
 
 contract FormalToken is ERC20 {
     constructor(string memory symbol) ERC20(symbol, symbol) { }
@@ -163,29 +157,13 @@ contract LotteryCommitmentHarness is LotteryFacet {
         external
         returns (CommitmentObservation memory result)
     {
-        LibLotteryStorage.IntegrationStorage storage integrations =
-            LibLotteryStorage.integrationStorage();
-        integrations.integrations[1] = IntegrationConfig(address(registry), address(0));
-
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         gs.configs[1].randomnessDelay = delay;
 
         uint256 roundId = 1;
         Round storage round = gs.rounds[roundId];
-        round.config = RoundConfigSnapshot({
-            paymentToken: address(0),
-            ticketPrice: 0,
-            ticketCount: 0,
-            salesDuration: 1 days,
-            randomnessDelay: delay,
-            maxTicketsPerPurchase: 0,
-            winnerBps: 0,
-            operatorProtocolBps: 0,
-            finalizerTip: 0
-        });
-        round.integrationVersion = 1;
 
-        _commitSellout(round, roundId);
+        _commitSelloutTarget(round, roundId, registry, delay);
         result.drandRound = round.drandRound;
         result.registryRoundTime = registry.roundTime(round.drandRound);
         result.commitmentBoundary = uint256(round.selloutAt) + round.config.randomnessDelay;

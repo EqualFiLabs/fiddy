@@ -18,11 +18,13 @@ bounded-loop warning. A compiled harness is not a proof result.
 
 ## Model bounds
 
-The commitment rule calls the exact production `_commitSellout` implementation with every
+The commitment rule calls the shared production `_commitSelloutTarget` implementation with every
 `uint32` randomness delay and a deterministic Registry summary whose first future round is exactly
-`timestamp + 1`. It proves the stored target is strictly future, uncached when selected, and
-unchanged by later mutation of the configuration catalog. It does not prove the preceding ticket
-purchase, the one-way lifecycle gate around `_commitSellout`, or Diamond dispatch; Foundry
+`timestamp + 1`. The live `_commitSellout` path resolves its Registry and delay from the Round's
+snapshotted integration and configuration before calling this same helper. The rule proves the
+stored target is strictly future, uncached when selected, and unchanged by later mutation of the
+configuration catalog. It does not prove the preceding ticket purchase, integration-version
+resolution, the one-way lifecycle gate around `_commitSellout`, or Diamond dispatch; Foundry
 integration and stateful invariants cover those paths. The Registry summary does not prove
 Quicknet arithmetic or cryptography; those belong to the separate `EqualFiDrandRegistry` proof
 package.

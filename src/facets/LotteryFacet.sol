@@ -141,14 +141,27 @@ contract LotteryFacet is ILottery {
         if (endExclusive == round.config.ticketCount) _commitSellout(round, roundId);
     }
 
-    function _commitSellout(Round storage round, uint256 roundId) internal {
+    function _commitSellout(Round storage round, uint256 roundId) private {
+        IntegrationConfig storage integration =
+            LibLotteryStorage.integrationStorage().integrations[round.integrationVersion];
+        _commitSelloutTarget(
+            round,
+            roundId,
+            IEqualFiDrandRegistry(integration.drandRegistry),
+            round.config.randomnessDelay
+        );
+    }
+
+    function _commitSelloutTarget(
+        Round storage round,
+        uint256 roundId,
+        IEqualFiDrandRegistry registry,
+        uint32 randomnessDelay
+    ) internal {
         round.status = RoundStatus.SoldOut;
         round.selloutAt = block.timestamp.toUint64();
 
-        IntegrationConfig storage integration =
-            LibLotteryStorage.integrationStorage().integrations[round.integrationVersion];
-        IEqualFiDrandRegistry registry = IEqualFiDrandRegistry(integration.drandRegistry);
-        uint256 commitmentBoundary = block.timestamp + round.config.randomnessDelay;
+        uint256 commitmentBoundary = block.timestamp + randomnessDelay;
         uint64 target = registry.firstRoundAfter(commitmentBoundary);
         if (target == 0 || registry.roundTime(target) <= commitmentBoundary) {
             revert Errors.InvalidRandomnessRound(target);
