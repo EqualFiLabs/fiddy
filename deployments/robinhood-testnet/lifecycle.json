@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "network": {
+    "name": "Robinhood Testnet",
+    "chainId": 46630
+  },
+  "contracts": {
+    "diamond": "0x89373b3946818811d9421a48410a6164D4608680",
+    "drandRegistry": "0x61388A94B429A04cAC0357485c12F68f706d7b57",
+    "operatorFeeRouter": "0xE7Bb1D2766377984546611291732cED1833C0c36",
+    "routerAdmin": "0x79c89f35d60fC2C0aEC9F5bB6D0B34d4c4B6dB87",
+    "weth": "0x33e4191705c386532ba27cBF171Db86919200B94",
+    "statics": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+    "flushProbe": {
+      "address": "0x4cD57fF042fF5566bbB45675836E56db6a50B329",
+      "runtimeKeccak256": "0xcdd7fc57ea49c6ae18a26365300f9548475a1cb524dce195d22b4352a8791d44"
+    },
+    "upgradeFacet": {
+      "address": "0x4e7DfAdFc563Fd0406f0f765a33BD78D15C93F82",
+      "runtimeKeccak256": "0x23e518698e08b12238c3fa4e8f3c6a7fb71bf849eafad529b11b43fca6d8380c",
+      "selectors": ["0x5c014ffd", "0x1c3d7870"],
+      "marker": "0xea4c60a47409fdd4a26885cf871cd42f9d208134017f5bf07bec41869ec71640"
+    }
+  },
+  "execution": {
+    "deployer": "0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316",
+    "lifecycleCommit": "435debd513d4cbc5ab89a9f2ca3da6c7ccac6e30",
+    "finalizedCutProbeCommit": "f30885924e7c1b8b13cf054cba61db8243038331",
+    "foundry": "1.7.1",
+    "compiler": "0.8.30+commit.73712a01",
+    "explorerVerification": "waived for the disposable deployment"
+  },
+  "startingBalances": {
+    "deployerNative": "29462500035720554",
+    "deployerWeth": "0",
+    "deployerStatics": "3376350964506172839506172",
+    "diamondWeth": "0",
+    "diamondStatics": "0",
+    "routerWeth": "0",
+    "routerStatics": "0"
+  },
+  "rounds": [
+    {
+      "roundId": 1,
+      "purpose": "concurrent WETH success and retryable Operator routing",
+      "configVersion": 1,
+      "integrationVersion": 1,
+      "paymentToken": "0x33e4191705c386532ba27cBF171Db86919200B94",
+      "openedAt": 1789430492,
+      "expiresAt": 1789430612,
+      "selloutAt": 1789430492,
+      "settledAt": 1789430559,
+      "drandRound": 32209045,
+      "soldTickets": 5,
+      "winningTicket": 4,
+      "status": 3,
+      "winner": "0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316",
+      "receipts": "50000000000000",
+      "winnerClaimableAfterClaims": "0",
+      "applicationSeed": "0x63a26a41f378d1cc86047776b5cc496f2d85fa5778d0706d515e43942296dbf0",
+      "allocations": {
+        "winner": "40000000000000",
+        "operator": "5000000000000",
+        "treasury": "4000000000000",
+        "finalizer": "1000000000000"
+      }
+    },
+    {
+      "roundId": 2,
+      "purpose": "concurrent unsold STATICS refund",
+      "configVersion": 2,
+      "integrationVersion": 1,
+      "paymentToken": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "openedAt": 1789430492,
+      "expiresAt": 1789430612,
+      "selloutAt": 0,
+      "settledAt": 0,
+      "drandRound": 0,
+      "soldTickets": 1,
+      "winningTicket": 0,
+      "status": 4,
+      "winner": "0x0000000000000000000000000000000000000000",
+      "receipts": "1000000000000000000",
+      "winnerClaimableAfterClaims": "0",
+      "applicationSeed": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "refund": "1000000000000000000"
+    },
+    {
+      "roundId": 3,
+      "purpose": "successful STATICS settlement and direct Operator routing",
+      "configVersion": 2,
+      "integrationVersion": 1,
+      "paymentToken": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "openedAt": 1789430693,
+      "expiresAt": 1789430813,
+      "selloutAt": 1789430693,
+      "settledAt": 1789430742,
+      "drandRound": 32209112,
+      "soldTickets": 5,
+      "winningTicket": 3,
+      "status": 3,
+      "winner": "0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316",
+      "receipts": "5000000000000000000",
+      "winnerClaimableAfterClaims": "0",
+      "applicationSeed": "0x0225223e0ee5dd65b61583bc3cef3fce757fa56913d956129fd27c78ae95ac1a",
+      "allocations": {
+        "winner": "4000000000000000000",
+        "operator": "500000000000000000",
+        "treasury": "400000000000000000",
+        "finalizer": "100000000000000000"
+      }
+    },
+    {
+      "roundId": 4,
+      "purpose": "post-finalization configuration, operation, expiration, and refund",
+      "configVersion": 2,
+      "integrationVersion": 1,
+      "paymentToken": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+      "openedAt": 1789431020,
+      "expiresAt": 1789431140,
+      "selloutAt": 0,
+      "settledAt": 0,
+      "drandRound": 0,
+      "soldTickets": 1,
+      "winningTicket": 0,
+      "status": 4,
+      "winner": "0x0000000000000000000000000000000000000000",
+      "receipts": "1000000000000000000",
+      "winnerClaimableAfterClaims": "0",
+      "applicationSeed": "0x0000000000000000000000000000000000000000000000000000000000000000",
+      "refund": "1000000000000000000"
+    }
+  ],
+  "quicknet": [
+    {
+      "roundId": 1,
+      "targetRound": 32209045,
+      "targetRoundTime": 1789430499,
+      "proofRepresentation": "compressed",
+      "proofBytes": 48,
+      "submittedProofKeccak256": "0xc91806550b2d176f881fbda7477850071e252af3f42a55aab92ce09198c6cd85",
+      "officialBeaconUrl": "https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/public/32209045",
+      "officialApiRandomness": "0x5be2a1b828470b817af66caa90d499ea3ff9b4ee301c61ef2a3b20e40b49c63e",
+      "registryRandomness": "0x01c7c0a392fc2cb69afedaac85efae76bfb2df4a06a66854dfe0d8b457b66c91",
+      "postedAt": 1789430559
+    },
+    {
+      "roundId": 3,
+      "targetRound": 32209112,
+      "targetRoundTime": 1789430700,
+      "proofRepresentation": "compressed",
+      "proofBytes": 48,
+      "submittedProofKeccak256": "0x91b8aed1a8b15750d6e1b0cf82529346a4423be3e54c42ca8023749212bd833d",
+      "officialBeaconUrl": "https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/public/32209112",
+      "officialApiRandomness": "0x396330c243e9bc9011a173166ed7d061487d0b59a59587d15763b2a218ac33c9",
+      "registryRandomness": "0xa6088df0af9b227437b42292270806cfac33f5da5186b8d4809858ab9038f47c",
+      "postedAt": 1789430742
+    }
+  ],
+  "operatorRouting": {
+    "unavailableWethProbe": {
+      "transactionHash": "0x46b29ccca4cf56f6f3cca7e22423eaec72a1a591859854871387eb762f03f513",
+      "observedRevertSelector": "0xe2230dd4",
+      "observedError": "OperatorRouterUnavailable(address,address)",
+      "pendingBefore": "5000000000000",
+      "pendingAfter": "5000000000000"
+    },
+    "routerBalances": {
+      "weth": "5000000000000",
+      "statics": "500000000000000000"
+    },
+    "rewardBooks": {
+      "wethTotalAdded": "5000000000000",
+      "wethAccountedLiability": "5000000000000",
+      "staticsTotalAdded": "500000000000000000",
+      "staticsAccountedLiability": "500000000000000000"
+    }
+  },
+  "finalState": {
+    "latestRoundId": 4,
+    "activeRoundCount": 0,
+    "protocolFinalized": true,
+    "config1Enabled": true,
+    "config2Enabled": true,
+    "diamondWeth": "0",
+    "diamondStatics": "0",
+    "wethAccounting": ["0", "0", "0", "0", "0", "0"],
+    "staticsAccounting": ["0", "0", "0", "0", "0", "0"],
+    "deployerWeth": "95000000000000",
+    "deployerStatics": "3376350464506172839506172",
+    "deployerNative": "29317584275720554"
+  },
+  "transactions": [
+    {"operation":"deploy flush probe","hash":"0x853c4ee0b3b4f7d73cf4ae2d161b2b84dab38ffc0d35928677edc3e0ff5d2e22","blockNumber":119625805,"blockTimestamp":1789430433,"gasUsed":276701,"status":1},
+    {"operation":"deploy upgrade facet","hash":"0xc539ec444c4941d585214130d87eddcac42409fd5f9cf6a5daf6f2be94328205","blockNumber":119625807,"blockTimestamp":1789430434,"gasUsed":147655,"status":1},
+    {"operation":"wrap WETH","hash":"0xe378fbe8fede5db4b0ac479aef19f044b13ba3dfc7fe379d0f3467f167dcbfdb","blockNumber":119626137,"blockTimestamp":1789430492,"gasUsed":48110,"status":1},
+    {"operation":"approve WETH","hash":"0xf4a854893438df3be072474f8a65f7ae3e548c5a7aee426714bd4e05ebcf82df","blockNumber":119626139,"blockTimestamp":1789430492,"gasUsed":50868,"status":1},
+    {"operation":"approve STATICS","hash":"0xf642a5280a606e85fcb10e5c6fd398fffaff3c90623b64b1630acc6f5833d76d","blockNumber":119626140,"blockTimestamp":1789430492,"gasUsed":53402,"status":1},
+    {"operation":"open sold-out WETH Round","hash":"0xe2c892776c43b2f81de688a9d5d59ba204e564678680abc47bd9d6f6d276c373","blockNumber":119626142,"blockTimestamp":1789430492,"gasUsed":412962,"status":1},
+    {"operation":"open concurrent STATICS Round","hash":"0xba968e41fc9bb4e67b3bf31491cf6724a24ef9a39f77abbdbda436c6bd941c95","blockNumber":119626144,"blockTimestamp":1789430492,"gasUsed":377003,"status":1},
+    {"operation":"disable WETH Router deposits","hash":"0x8302b643e396870a5831faa76a05d578f99e0f42614b9292ecc5f662f3c2024c","blockNumber":119626539,"blockTimestamp":1789430559,"gasUsed":39945,"status":1},
+    {"operation":"settle WETH Round","hash":"0x472cada3d53bcd96083fc806c49e3c0a3df90ca396997874e730a0aef033d2fe","blockNumber":119626541,"blockTimestamp":1789430559,"gasUsed":531325,"status":1},
+    {"operation":"probe unavailable WETH routing","hash":"0x46b29ccca4cf56f6f3cca7e22423eaec72a1a591859854871387eb762f03f513","blockNumber":119626543,"blockTimestamp":1789430559,"gasUsed":82521,"status":1},
+    {"operation":"enable WETH Router deposits","hash":"0x58c2dd59a0c6d4a59baa2d0e4be9c5a111ba8773c3a6d0d0e869112883c940df","blockNumber":119626545,"blockTimestamp":1789430560,"gasUsed":39957,"status":1},
+    {"operation":"flush WETH Operator revenue","hash":"0xd388972cd207888975a5d2951d7365eac27c7f8dfa82bdedb633a4e9ba195356","blockNumber":119626547,"blockTimestamp":1789430560,"gasUsed":202032,"status":1},
+    {"operation":"claim WETH winner proceeds","hash":"0x65a830849c90b4312647bf445eb5ca6f089d8635f1cfab04f7e5f4c6d07dd493","blockNumber":119626549,"blockTimestamp":1789430560,"gasUsed":62643,"status":1},
+    {"operation":"claim WETH finalizer tip","hash":"0xd9ec7915fbedd676516200628150529ed3bf014a735a717722ef815e28794593","blockNumber":119626551,"blockTimestamp":1789430560,"gasUsed":58363,"status":1},
+    {"operation":"flush WETH Treasury proceeds","hash":"0xd2fe225ca351c183a1317e5ea8df212cbf6a93060f4695802075f6d674709e9d","blockNumber":119626553,"blockTimestamp":1789430560,"gasUsed":54621,"status":1},
+    {"operation":"expire concurrent STATICS Round","hash":"0x1bd5677492b27600d69c6452867769fb1ed900fd8065b0a0ab7d30a2642bd278","blockNumber":119627088,"blockTimestamp":1789430644,"gasUsed":68160,"status":1},
+    {"operation":"refund concurrent STATICS Round","hash":"0xe92a194103a319a6a05e86b1fc1d29dacbd557d24fa400cb6a6e1def724cf598","blockNumber":119627090,"blockTimestamp":1789430644,"gasUsed":70747,"status":1},
+    {"operation":"open sold-out STATICS Round","hash":"0x19bbaf2c46273c8ed28d31057af602a8cc4d3f177640c8dd42081dc7201afbf9","blockNumber":119627378,"blockTimestamp":1789430693,"gasUsed":408231,"status":1},
+    {"operation":"settle STATICS Round","hash":"0xde9b3d8013e05b8f59549225f7a04e86ecd02c0ea3b3fb4d60152be3793e0788","blockNumber":119627689,"blockTimestamp":1789430742,"gasUsed":526452,"status":1},
+    {"operation":"flush STATICS Operator revenue","hash":"0x2f7b3ec93ac0d1def43252f67d407b159ae369f24d640883c50c0dbed60b9802","blockNumber":119627691,"blockTimestamp":1789430743,"gasUsed":215159,"status":1},
+    {"operation":"claim STATICS winner proceeds","hash":"0x2eb19c9843123fc8508c19a3a8dba9e600b23899b618beb463c601f743dcf705","blockNumber":119627693,"blockTimestamp":1789430743,"gasUsed":74563,"status":1},
+    {"operation":"claim STATICS finalizer tip","hash":"0x02a1eff447da178d91b0278316c28788960463643c4a283cc6694f59838c285e","blockNumber":119627694,"blockTimestamp":1789430743,"gasUsed":70283,"status":1},
+    {"operation":"flush STATICS Treasury proceeds","hash":"0x23a3cb92cc6dfc2827b13a8882aa458bdb6540e5e97be21e4ddf1ede31dcd888","blockNumber":119627696,"blockTimestamp":1789430743,"gasUsed":66471,"status":1},
+    {"operation":"add lifecycle upgrade facet","hash":"0x7070a8704a48800705ea0c2d2223b5b5696b5c61a896be595f3403b7b20ee8f8","blockNumber":119628040,"blockTimestamp":1789430800,"gasUsed":213428,"status":1},
+    {"operation":"set lifecycle upgrade marker","hash":"0x7d6ea319b5fe0e70016bc016ab2fd5bc0c71400845db6cb596b3d3c09393a4b4","blockNumber":119628042,"blockTimestamp":1789430800,"gasUsed":56688,"status":1},
+    {"operation":"finalize protocol code","hash":"0xe3012caa1d0da1f5d20b5f3bb320fbd60facc3453d0087e4960cc4ea88bf130a","blockNumber":119628043,"blockTimestamp":1789430801,"gasUsed":35849,"status":1},
+    {"operation":"reject cut after finalization","hash":"0x85942842127da2e0aca55762a3209ad6aecdc6d20df49e72a225425b96d59cbb","blockNumber":119629213,"blockTimestamp":1789430984,"gasUsed":36849,"status":0},
+    {"operation":"disable config after finalization","hash":"0x606fc1b64a6b22236c3604cb30a28536d44fe2fc5e1eb65b5aec5c6f6d6e29ec","blockNumber":119629409,"blockTimestamp":1789431019,"gasUsed":38822,"status":1},
+    {"operation":"enable config after finalization","hash":"0x5a7df8348ca7b68e13ba89dec7e89b69df99a4cc65c107db82ff59dfb86a89d1","blockNumber":119629411,"blockTimestamp":1789431019,"gasUsed":60767,"status":1},
+    {"operation":"open Round after finalization","hash":"0x762b5af9a5efcb7197d632d12670a5a2db137706cba0dc3a55e79fa6a6a0cf2c","blockNumber":119629413,"blockTimestamp":1789431020,"gasUsed":395582,"status":1},
+    {"operation":"expire Round after finalization","hash":"0xa7197a02b2ef1e144b49cc848948efeee1cfb54e2a6a71361096c8d16e5efa39","blockNumber":119630422,"blockTimestamp":1789431178,"gasUsed":68550,"status":1},
+    {"operation":"refund Round after finalization","hash":"0x6ed4f86ba4d42ef38201f590f4ca6a013e4f0f03b01d82c9d9d2305be5d611d1","blockNumber":119630423,"blockTimestamp":1789431178,"gasUsed":71223,"status":1}
+  ]
+}

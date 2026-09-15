@@ -70,8 +70,12 @@ contract RevenueFacet is IRevenue {
     }
 
     function availableTokenSurplus(address asset) public view returns (uint256) {
-        AssetAccounting storage accounting =
-            LibLotteryStorage.accountingStorage().assetAccounting[asset];
+        LibLotteryStorage.AccountingStorage storage accountingStorage =
+            LibLotteryStorage.accountingStorage();
+        if (!accountingStorage.admittedPaymentToken[asset]) {
+            revert Errors.SurplusAssetNotAdmitted(asset);
+        }
+        AssetAccounting storage accounting = accountingStorage.assetAccounting[asset];
         uint256 accounted = accounting.activeRoundEscrow + accounting.winnerLiability
             + accounting.refundLiability + accounting.finalizerLiability
             + accounting.pendingOperatorRevenueTotal + accounting.treasuryAvailable;

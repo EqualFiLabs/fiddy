@@ -158,14 +158,14 @@ All economic and operational configuration affects future Rounds only. Governanc
     - _Requirements: 5.7-5.9, 6.1-6.5_
   - [ ] 9.2 Implement first-purchase Round creation
     - New file: `src/facets/LotteryFacet.sol`
-    - Details: `openRound(configVersion, ticketQuantity)` creates a Round from a governance-enabled immutable configuration and performs its first ERC-20 purchase atomically; snapshot Payment Token, config/integration versions, and enforce global concurrency.
+    - Details: `openRound(configVersion, ticketQuantity)` creates a Round from a governance-enabled immutable configuration and performs its first ERC-20 purchase atomically; snapshot Payment Token and config/integration versions, enforce global concurrency, and allow at most one non-terminal Round per Configuration Version.
     - _Requirements: 3.1-3.6, 4.1-4.7, 5.1-5.11_
   - [ ] 9.3 Implement additional ticket purchases
     - Details: Pull the Round's Payment Token with `SafeERC20`; require buyer spent and Diamond received exactly `ticketPrice * quantity`; enforce ticket availability, status, expiry, and purchase limits; increment buyer refund credit on every purchase.
     - _Requirements: 5.1-5.11, 6.1-6.5, 19.2_
   - [ ] 9.4 Implement atomic Sellout transition
-    - Details: Mark sold out, record `selloutAt`, select future Quicknet round from snapshotted delay, reject already-cached target, and store the target permanently.
-    - _Requirements: 7.1-7.7, 16.1-16.5_
+    - Details: Mark sold out, record `selloutAt`, select the Quicknet round scheduled strictly after the L2 timestamp boundary and snapshotted delay, reject an already-cached target, and store the target permanently. Document that wall-clock freshness assumes honest ordering and timestamp progression by the Robinhood-operated sequencer.
+    - _Requirements: 7.1-7.8, 16.1-16.5_
   - [ ] 9.5 Implement unsold Round expiry
     - Details: Permissionless expiry; convert escrow to participant refund liabilities; allocate zero protocol revenue.
     - _Requirements: 15.1-15.10, 18.2, 19.4_
@@ -232,8 +232,8 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Permissionless per-token flush only to the governance-configured Treasury recipient, using exact-transfer validation.
     - _Requirements: 14.1-14.6, 19.8_
   - [ ] 13.6 Implement provable per-token surplus handling
-    - Details: For each ERC-20, surplus equals Diamond token balance minus that token's recorded liabilities and available Treasury revenue; allow explicit absorption into Treasury without touching any token's liabilities. Treat forced native ETH separately as non-Lottery Treasury surplus.
-    - _Requirements: 14.1-14.6, 19.9-19.11_
+    - Details: For each governance-admitted canonical Payment Token address, surplus equals Diamond token balance minus that token's recorded liabilities and available Treasury revenue; reject arbitrary token addresses, and allow explicit absorption into Treasury without touching any token's liabilities. Treat forced native ETH separately as non-Lottery Treasury surplus. Deployment validation must reject multiple ERC-20 addresses that control the same underlying balance ledger.
+    - _Requirements: 14.1-14.6, 19.9-19.12_
 
 - [ ] 14. Implement complete read/indexer surface
   - [ ] 14.1 Create `LotteryViewFacet`
@@ -257,7 +257,7 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Valid/invalid BPS, zero semantics, Payment Token validation, immutable configuration creation, enable/disable behavior, global limits, versioning, and historical snapshots.
     - _Requirements: 1-3_
   - [ ] 16.2 Add `test/LotteryPurchases.t.sol` and `test/TicketRanges.t.sol`
-    - Details: Exact ERC-20 transfers, insufficient allowance/balance, receiver-fee and sender-fee rejection, direct-donation resistance, overselling, purchase limits, ranges, binary search, boundaries, Sellout, and concurrent different-token Rounds.
+    - Details: Exact ERC-20 transfers, insufficient allowance/balance, receiver-fee and sender-fee rejection, direct-donation resistance, overselling, purchase limits, ranges, binary search, boundaries, Sellout, one active Round per configuration, and concurrent different-token Rounds.
     - _Requirements: 4-7, 19_
   - [ ] 16.3 Add `test/LotterySettlement.t.sol`
     - Details: Cached/uncached beacons, wrong/stale rounds, deterministic winner, split permutations, rounding, zero/100% shares, tip caps.
@@ -266,7 +266,7 @@ All economic and operational configuration affects future Rounds only. Governanc
     - Details: Include reverting, paused, blocked, fee-mutated, and inexact token transfers; invalid receivers; preserved liabilities; and double-claim attempts.
     - _Requirements: 12, 15, 18-20_
   - [ ] 16.5 Add `test/LotteryRevenue.t.sol`
-    - Details: Direct same-token Router contribution, exact allowance behavior, incomplete Router bootstrap, unregistered/disabled asset, zero effective weight, Router liability/index capacity rejection, Treasury transfers, per-token surplus, cross-token isolation, version preservation, and atomicity.
+    - Details: Direct same-token Router contribution, exact allowance behavior, incomplete Router bootstrap, unregistered/disabled asset, zero effective weight, Router liability/index capacity rejection, Treasury transfers, canonical-token surplus, shared-ledger alias rejection, rebasing/balance-drift boundaries, cross-token isolation, version preservation, and atomicity.
     - _Requirements: 13, 14, 19, 20, 22_
   - [ ] 16.6 Add `test/LotteryGovernance.t.sol` and `test/LotteryDiamond.t.sol`
     - Details: Timelock-only upgrades/config, guardian limitations, pause, facet changes, irreversible finalization.
@@ -291,7 +291,7 @@ All economic and operational configuration affects future Rounds only. Governanc
 
 - [ ] 18. Add formal verification targets
   - [ ] 18.1 Prove Lottery commitment to immutable Registry randomness.
-    - Details: Prove a sold-out Round commits exactly once to the configured strictly-future drand Round and that neither upgrades nor ordinary lifecycle calls can change its target or substitute another randomness source.
+    - Details: Prove a sold-out Round commits exactly once to the configured drand Round scheduled strictly after its L2 timestamp boundary and that neither upgrades nor ordinary lifecycle calls can change its target or substitute another randomness source. State explicitly that the proof does not establish wall-clock freshness or fair ordering against a malicious sequencer.
     - _Requirements: 7-9, 16, 24.10, 25_
   - [ ] 18.2 Add Halmos proof for `cutsDisabled` irreversibility.
     - _Requirements: 24.5-24.8_
@@ -312,12 +312,13 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 19.3 Review all external-call paths for CEI and liability preservation.
   - [ ] 19.4 Review every governance function against the post-finalization trust model.
   - [ ] 19.5 Ensure all security gates pass.
+    - Details: Confirm the release threat model treats Robinhood-operated-sequencer honesty as a target-chain assumption and does not overstate timestamp-freshness or transaction-ordering guarantees.
     - _Requirements: 1-25_
 
 - [ ] 20. Deploy and validate `EqualFiDrandRegistry` on Robinhood Testnet
   - [ ] 20.1 Add chain-guarded testnet deployment script.
   - [ ] 20.2 Deploy registry and record address, code hash, compiler version, dependency commits, and transaction.
-  - [ ] 20.3 Verify a real live future Quicknet Round onchain.
+  - [ ] 20.3 Verify a real live Quicknet Round scheduled strictly after the observed L2 commitment boundary onchain.
   - [ ] 20.4 Where practical, demonstrate equivalent compressed and uncompressed representations against real Quicknet data.
   - [ ] 20.5 Record the deployed runtime bytecode hash and reconcile Robinhood EIP-2537 results with the proof package's concrete-assumption vectors.
     - _Requirements: 8, 23.1-23.4, 25.9-25.12_
@@ -356,7 +357,7 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 23.1 Add `docs/architecture.md` for Diamond trust boundary, lifecycle, randomness, accounting, Operator integration, and progressive immutability.
     - _Requirements: 21, 22, 24_
   - [ ] 23.2 Add `docs/randomness.md` for Quicknet trust model, target selection, no fallback, 48/96 support, normalization, and domain separation.
-    - Details: Include the exact formal claim, EIP-2537 model, trusted computing base, proof exclusions, pinned artifacts, and distinction between formal, differential, fork, and live evidence.
+    - Details: Include the exact formal claim, EIP-2537 model, trusted computing base, Robinhood-operated-sequencer honesty assumption, proof exclusions, pinned artifacts, and distinction between formal, differential, fork, and live evidence.
     - _Requirements: 7-9, 16, 22, 25_
   - [ ] 23.3 Add `docs/accounting.md` for per-token conservation and isolation, liabilities, Treasury, refunds, direct same-token Operator routing, and surplus.
     - _Requirements: 10-15, 19-20_
@@ -371,6 +372,7 @@ All economic and operational configuration affects future Rounds only. Governanc
   - [ ] 24.3 Verify deployment manifests and external integration addresses.
   - [ ] 24.4 Verify no unresolved path can alter a live Round's snapshotted terms.
   - [ ] 24.5 Verify no fallback randomness exists anywhere in production code.
+    - Details: Verify documentation distinguishes exclusive drand entropy from the accepted Robinhood sequencer ordering and timestamp trust boundary.
   - [ ] 24.6 Verify settlement contains no dependency on Winner, Treasury, Payment Token, or Operator Router transfer success.
   - [ ] 24.7 Verify all ERC-20 ingress and egress paths require exact deltas and cannot cross-subsidize another token.
   - [ ] 24.8 Verify Diamond finalization is irreversible.

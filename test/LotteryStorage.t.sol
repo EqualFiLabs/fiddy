@@ -14,6 +14,21 @@ contract LotteryStorageHarness {
         LibLotteryStorage.reentrancyStorage().status = 44;
     }
 
+    function writeAdmissionState(address asset, uint64 configVersion, uint256 activeRoundId)
+        external
+    {
+        LibLotteryStorage.gameStorage().activeRoundForConfig[configVersion] = activeRoundId;
+        LibLotteryStorage.accountingStorage().admittedPaymentToken[asset] = true;
+    }
+
+    function activeRoundForConfig(uint64 configVersion) external view returns (uint256) {
+        return LibLotteryStorage.gameStorage().activeRoundForConfig[configVersion];
+    }
+
+    function admittedPaymentToken(address asset) external view returns (bool) {
+        return LibLotteryStorage.accountingStorage().admittedPaymentToken[asset];
+    }
+
     function readDomains(address asset)
         external
         view
@@ -49,6 +64,18 @@ contract LotteryStorageTest is Test {
             uint256 reentrancyStatus
         ) = harness.readDomains(asset);
 
+        assertEq(roundId, 11);
+        assertEq(integrationVersion, 22);
+        assertEq(treasuryAvailable, 33);
+        assertEq(storedGuardian, guardian);
+        assertEq(reentrancyStatus, 44);
+
+        harness.writeAdmissionState(asset, 55, 66);
+        assertEq(harness.activeRoundForConfig(55), 66);
+        assertTrue(harness.admittedPaymentToken(asset));
+
+        (roundId, integrationVersion, treasuryAvailable, storedGuardian, reentrancyStatus) =
+            harness.readDomains(asset);
         assertEq(roundId, 11);
         assertEq(integrationVersion, 22);
         assertEq(treasuryAvailable, 33);

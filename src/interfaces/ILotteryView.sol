@@ -33,6 +33,7 @@ interface ILotteryView {
     function integrationAt(uint64 version) external view returns (IntegrationConfig memory);
     function activeRoundCount() external view returns (uint256);
     function maxActiveRounds() external view returns (uint16);
+    function activeRoundForConfig(uint64 configVersion) external view returns (uint256 roundId);
     function pendingOperatorRevenue(uint64 integrationVersion, address asset)
         external
         view

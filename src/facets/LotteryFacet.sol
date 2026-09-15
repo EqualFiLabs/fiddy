@@ -44,6 +44,10 @@ contract LotteryFacet is ILottery {
             revert Errors.ConfigNotFound(configVersion);
         }
         if (!gs.configEnabled[configVersion]) revert Errors.ConfigDisabled(configVersion);
+        uint256 existingRoundId = gs.activeRoundForConfig[configVersion];
+        if (existingRoundId != 0) {
+            revert Errors.ConfigAlreadyActive(configVersion, existingRoundId);
+        }
 
         LibLotteryStorage.IntegrationStorage storage integrations =
             LibLotteryStorage.integrationStorage();
@@ -68,6 +72,7 @@ contract LotteryFacet is ILottery {
         round.openedAt = block.timestamp.toUint64();
         round.expiresAt = expiration.toUint64();
         round.status = RoundStatus.Open;
+        gs.activeRoundForConfig[configVersion] = roundId;
         ++gs.activeRoundCount;
 
         emit RoundOpened(
@@ -103,6 +108,7 @@ contract LotteryFacet is ILottery {
         if (block.timestamp < round.expiresAt) revert Errors.RoundNotExpired(roundId);
 
         round.status = RoundStatus.Expired;
+        gs.activeRoundForConfig[round.configVersion] = 0;
         --gs.activeRoundCount;
 
         AssetAccounting storage accounting =
@@ -142,14 +148,27 @@ contract LotteryFacet is ILottery {
     }
 
     function _commitSellout(Round storage round, uint256 roundId) private {
+        IntegrationConfig storage integration =
+            LibLotteryStorage.integrationStorage().integrations[round.integrationVersion];
+        _commitSelloutTarget(
+            round,
+            roundId,
+            IEqualFiDrandRegistry(integration.drandRegistry),
+            round.config.randomnessDelay
+        );
+    }
+
+    function _commitSelloutTarget(
+        Round storage round,
+        uint256 roundId,
+        IEqualFiDrandRegistry registry,
+        uint32 randomnessDelay
+    ) internal returns (uint256 commitmentBoundary, uint64 target) {
         round.status = RoundStatus.SoldOut;
         round.selloutAt = block.timestamp.toUint64();
 
-        IntegrationConfig storage integration =
-            LibLotteryStorage.integrationStorage().integrations[round.integrationVersion];
-        IEqualFiDrandRegistry registry = IEqualFiDrandRegistry(integration.drandRegistry);
-        uint256 commitmentBoundary = block.timestamp + round.config.randomnessDelay;
-        uint64 target = registry.firstRoundAfter(commitmentBoundary);
+        commitmentBoundary = block.timestamp + randomnessDelay;
+        target = registry.firstRoundAfter(commitmentBoundary);
         if (target == 0 || registry.roundTime(target) <= commitmentBoundary) {
             revert Errors.InvalidRandomnessRound(target);
         }

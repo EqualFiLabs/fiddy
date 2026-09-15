@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.30;
 
+import { IERC20Errors } from "openzeppelin-contracts/contracts/interfaces/draft-IERC6093.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+
 import { Errors } from "../src/shared/Errors.sol";
 import { IRevenue } from "../src/interfaces/IRevenue.sol";
 import { AssetAccounting, IntegrationConfig, LotteryConfig, Round } from "../src/shared/Types.sol";
@@ -24,6 +27,97 @@ contract RevenueSenderFeeToken is IntegrationToken {
         if (feesEnabled && from != address(0) && to != address(0) && value != 0) {
             super._update(from, address(0), 1);
         }
+    }
+}
+
+contract BalanceDriftToken is IntegrationToken {
+    constructor() IntegrationToken("Balance Drift Token", "DRIFT") { }
+
+    function driftDown(address account, uint256 amount) external {
+        _burn(account, amount);
+    }
+}
+
+contract SharedBalanceLedger {
+    mapping(address account => uint256 amount) internal balances;
+    mapping(address facade => bool enabled) internal facades;
+    uint256 internal supply;
+
+    function admitFacade(address facade) external {
+        facades[facade] = true;
+    }
+
+    function mint(address receiver, uint256 amount) external {
+        balances[receiver] += amount;
+        supply += amount;
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return supply;
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return balances[account];
+    }
+
+    function move(address from, address to, uint256 amount) external {
+        require(facades[msg.sender], "unadmitted facade");
+        uint256 available = balances[from];
+        if (available < amount) {
+            revert IERC20Errors.ERC20InsufficientBalance(from, available, amount);
+        }
+        unchecked {
+            balances[from] = available - amount;
+            balances[to] += amount;
+        }
+    }
+}
+
+contract SharedLedgerToken is IERC20 {
+    SharedBalanceLedger internal immutable ledger;
+    mapping(address owner => mapping(address spender => uint256 amount)) internal allowances;
+
+    constructor(SharedBalanceLedger ledger_) {
+        ledger = ledger_;
+        ledger_.admitFacade(address(this));
+    }
+
+    function totalSupply() external view returns (uint256) {
+        return ledger.totalSupply();
+    }
+
+    function balanceOf(address account) external view returns (uint256) {
+        return ledger.balanceOf(account);
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        ledger.move(msg.sender, to, amount);
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function allowance(address owner, address spender) external view returns (uint256) {
+        return allowances[owner][spender];
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowances[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        uint256 available = allowances[from][msg.sender];
+        if (available != type(uint256).max) {
+            require(available >= amount, "insufficient allowance");
+            unchecked {
+                allowances[from][msg.sender] = available - amount;
+            }
+            emit Approval(from, msg.sender, allowances[from][msg.sender]);
+        }
+        ledger.move(from, to, amount);
+        emit Transfer(from, to, amount);
+        return true;
     }
 }
 
@@ -215,6 +309,74 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         assertEq(stateView.assetAccounting(address(tokenA)).treasuryAvailable, 7);
         vm.expectRevert(Errors.NoTokenSurplus.selector);
         revenue.absorbTokenSurplus(address(tokenA));
+    }
+
+    function test_UnadmittedSharedLedgerAliasCannotAbsorbConfiguredCustody() public {
+        SharedBalanceLedger ledger = new SharedBalanceLedger();
+        SharedLedgerToken canonicalToken = new SharedLedgerToken(ledger);
+        SharedLedgerToken aliasToken = new SharedLedgerToken(ledger);
+        router.setAsset(address(canonicalToken), true, true);
+
+        LotteryConfig memory config = _config(address(canonicalToken), 10, 10, 10, 1 days, 0);
+        vm.startPrank(authority);
+        uint64 version = governance.createLotteryConfig(config);
+        governance.setLotteryConfigEnabled(version, true);
+        vm.stopPrank();
+
+        ledger.mint(alice, 100);
+        vm.prank(alice);
+        canonicalToken.approve(address(diamond), type(uint256).max);
+        vm.prank(alice);
+        lottery.openRound(version, 5);
+
+        assertEq(canonicalToken.balanceOf(address(diamond)), 50);
+        assertEq(aliasToken.balanceOf(address(diamond)), 50);
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.SurplusAssetNotAdmitted.selector, address(aliasToken))
+        );
+        revenue.availableTokenSurplus(address(aliasToken));
+        vm.expectRevert(
+            abi.encodeWithSelector(Errors.SurplusAssetNotAdmitted.selector, address(aliasToken))
+        );
+        revenue.absorbTokenSurplus(address(aliasToken));
+
+        assertEq(canonicalToken.balanceOf(address(diamond)), 50);
+        assertEq(stateView.assetAccounting(address(canonicalToken)).activeRoundEscrow, 50);
+        assertEq(stateView.assetAccounting(address(aliasToken)).treasuryAvailable, 0);
+    }
+
+    function test_DownwardBalanceDriftCannotBecomeSurplusAndPreservesRefund() public {
+        BalanceDriftToken token = new BalanceDriftToken();
+        router.setAsset(address(token), true, true);
+        LotteryConfig memory config = _config(address(token), 10, 10, 10, 1 days, 0);
+        vm.startPrank(authority);
+        uint64 version = governance.createLotteryConfig(config);
+        governance.setLotteryConfigEnabled(version, true);
+        vm.stopPrank();
+
+        token.mint(alice, 50);
+        vm.prank(alice);
+        token.approve(address(diamond), type(uint256).max);
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(version, 5);
+        token.driftDown(address(diamond), 1);
+
+        Round memory open = stateView.round(roundId);
+        vm.warp(open.expiresAt);
+        lottery.expireRound(roundId);
+
+        assertEq(revenue.availableTokenSurplus(address(token)), 0);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientBalance.selector, address(diamond), 49, 50
+            )
+        );
+        vm.prank(alice);
+        claims.claimRefund(roundId, alice);
+
+        assertEq(stateView.refundableAmount(roundId, alice), 50);
+        assertEq(stateView.assetAccounting(address(token)).refundLiability, 50);
+        assertEq(token.balanceOf(address(diamond)), 49);
     }
 
     function test_InexactRouterTransferRollsBackLiabilityAndRouterState() public {

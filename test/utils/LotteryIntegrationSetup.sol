@@ -333,7 +333,7 @@ abstract contract LotteryIntegrationSetup is Test {
     }
 
     function _stateSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](16);
+        selectors = new bytes4[](17);
         selectors[0] = ILotteryView.latestLotteryConfigVersion.selector;
         selectors[1] = ILotteryView.latestRoundId.selector;
         selectors[2] = ILotteryView.round.selector;
@@ -350,5 +350,6 @@ abstract contract LotteryIntegrationSetup is Test {
         selectors[13] = ILotteryView.pendingOperatorRevenue.selector;
         selectors[14] = ILotteryView.assetAccounting.selector;
         selectors[15] = ILotteryView.finalizerCredit.selector;
+        selectors[16] = ILotteryView.activeRoundForConfig.selector;
     }
 }

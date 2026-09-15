@@ -30,6 +30,7 @@ library LibLotteryStorage {
         mapping(uint256 roundId => Round round) rounds;
         mapping(uint256 roundId => TicketRange[] entries) entries;
         mapping(uint256 roundId => mapping(address user => uint256 amount)) refundCredit;
+        mapping(uint64 configVersion => uint256 roundId) activeRoundForConfig;
     }
 
     struct IntegrationStorage {
@@ -42,6 +43,7 @@ library LibLotteryStorage {
         mapping(uint64 integrationVersion => mapping(address asset => uint256 amount))
             pendingOperatorRevenue;
         mapping(address asset => mapping(address finalizer => uint256 amount)) finalizerCredits;
+        mapping(address asset => bool admitted) admittedPaymentToken;
     }
 
     struct GovernanceStorage {

@@ -44,6 +44,33 @@ contract ReentrantDrandRegistry is IEqualFiDrandRegistry {
 }
 
 contract LotterySettlementTest is LotteryIntegrationSetup {
+    function test_SettlesMaximumReachableRoundReceipts() public {
+        uint96 price = type(uint96).max;
+        uint32 count = type(uint32).max;
+        uint256 gross = uint256(price) * count;
+        LotteryConfig memory config = _config(address(tokenA), price, count, count, 1 days, 0);
+
+        vm.startPrank(authority);
+        uint64 version = governance.createLotteryConfig(config);
+        governance.setLotteryConfigEnabled(version, true);
+        vm.stopPrank();
+
+        tokenA.mint(alice, gross);
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(version, count);
+        Round memory soldOut = stateView.round(roundId);
+        registry.cache(soldOut.drandRound, keccak256("maximum receipts"), soldOut.selloutAt + 1);
+        settlement.settleRound(roundId, "");
+
+        AssetAccounting memory accounting = stateView.assetAccounting(address(tokenA));
+        assertEq(soldOut.receipts, gross);
+        assertEq(
+            accounting.winnerLiability + accounting.pendingOperatorRevenueTotal
+                + accounting.treasuryAvailable + accounting.finalizerLiability,
+            gross
+        );
+    }
+
     function test_SubmittedProofSettlesIntoExactTokenLiabilities() public {
         uint256 roundId = _sellOutRoundA();
         Round memory soldOut = stateView.round(roundId);
@@ -206,8 +233,14 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
     }
 
     function test_DomainSeparatesRoundsUsingSameRegistryRandomness() public {
+        vm.startPrank(authority);
+        governance.createLotteryConfig(_config(address(tokenA), 10, 10, 10, 1 days, 30));
+        governance.setLotteryConfigEnabled(3, true);
+        vm.stopPrank();
+
         uint256 firstRoundId = _sellOutRoundA();
-        uint256 secondRoundId = _sellOutRoundA();
+        vm.prank(alice);
+        uint256 secondRoundId = lottery.openRound(3, 10);
         Round memory first = stateView.round(firstRoundId);
         Round memory second = stateView.round(secondRoundId);
         assertEq(first.drandRound, second.drandRound);

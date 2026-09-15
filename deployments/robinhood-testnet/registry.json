@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "network": "Robinhood Testnet",
+  "chainId": 46630,
+  "deploymentCandidateCommit": "49b16267c93ebed55d943da00e0445c0cd548574",
+  "registryDependency": {
+    "repository": "EqualFiLabs/drand-registry",
+    "releaseStackCommit": "cdc760a9bf5bbbc1647d13e43b22858677dacad6",
+    "verifiedProductionSourceCommit": "f8db2a1752d22672d4de1708545e286a32c41497",
+    "blsSolidityCommit": "11af179a8287d978659aae07adb66aa60f64b8a6",
+    "forgeStdCommit": "bf647bd6046f2f7da30d0c2bf435e5c76a780c1b"
+  },
+  "compiler": {
+    "solc": "0.8.30+commit.73712a01.Linux.g++",
+    "solcBinarySha256": "f3e987dc6ecebd4bd350c48edcbc320b46cf9e3109bd3fc3d88f1acaf4c428f7",
+    "optimizer": true,
+    "optimizerRuns": 200,
+    "evmVersion": "osaka"
+  },
+  "toolchain": {
+    "foundry": "1.7.1",
+    "foundryCommit": "4072e48705af9d93e3c0f6e29e93b5e9a40caed8"
+  },
+  "registryDeployment": {
+    "address": "0x61388A94B429A04cAC0357485c12F68f706d7b57",
+    "deployer": "0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316",
+    "transactionHash": "0x39c2b2d2c2d3b1c64e29163a680355a1d159c9d513107517e1cb02b82d2c0485",
+    "blockNumber": 119600734,
+    "blockHash": "0x1e140cfd4a0e4e80bfa90e1ccfe8226383d1af714011e75b44feb72b1a349d98",
+    "blockTimestamp": 1789426563,
+    "gasUsed": 1584281,
+    "constructorArguments": [],
+    "runtimeBytes": 6458,
+    "runtimeKeccak256": "0xde08fa453cee52a32750e6ff4f736d28b2a4378494cc699e62d27eb44164c1fc"
+  },
+  "conformanceHarness": {
+    "purpose": "Throwaway target-client validation; not a production dependency",
+    "source": "lib/drand-registry/test/helpers/QuicknetVerifierHarness.sol",
+    "address": "0xbC3D9B7Cecc9570bC560813D7AB36b96A28EcDaD",
+    "deployer": "0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316",
+    "transactionHash": "0xbc7b26f34a82f28b31ff3c80a21b4678f68a55cd3dba6d2f187e10b8b9ff5a96",
+    "blockNumber": 119602085,
+    "blockHash": "0x2d479b8a3366fc69007bdc769502f32cbea93bff4c7c30952cd34a3fbee7363b",
+    "blockTimestamp": 1789426758,
+    "gasUsed": 1663249,
+    "runtimeBytes": 6738,
+    "runtimeKeccak256": "0xbc7da875f32f258f6096a858912de965d30808e834f63c6d636650266ea65944"
+  },
+  "quicknet": {
+    "chainHash": "52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971",
+    "periodSeconds": 3,
+    "validations": [
+      {
+        "proofRepresentation": "compressed",
+        "proofBytes": 48,
+        "boundary": {
+          "blockNumber": 119601057,
+          "blockHash": "0xf0795e756cb2b8c96e037eac8a996fc3b391f8b7a382cfdaae36799881d3b9be",
+          "timestamp": 1789426607
+        },
+        "targetRound": 32207748,
+        "targetRoundTime": 1789426608,
+        "strictlyAfterBoundary": true,
+        "officialBeaconUrl": "https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/public/32207748",
+        "officialApiRandomness": "0x89b7e86462c115bbc6837a53141ed3785093f3232b8eaadbea4583519852c9de",
+        "submittedProofKeccak256": "0xe2f1a8656ea597e2b14db6f4fbe6f58f8b93a455cc6cbf71db229b876fddce65",
+        "canonicalPointKeccak256": "0x31b40023c290d6b93cbf51f078406142182843cf026450420ce17f5084d4be2e",
+        "registryRandomness": "0x49f2e6b9132737ff64d67357b47869e2020e8d5421427c8266e01d41226b15d4",
+        "postedAt": 1789426658,
+        "transactionHash": "0xf06820101870b4929c432d8ed745a7f84684de1e5476f0d22c14e97bb84345c3",
+        "blockNumber": 119601401,
+        "blockHash": "0x8e60921409ab7c8312da0b1e7f7d45cee4d4ba72f510b0e554fe49f062ef0df8",
+        "gasUsed": 300592,
+        "status": "success"
+      },
+      {
+        "proofRepresentation": "uncompressed",
+        "proofBytes": 96,
+        "boundary": {
+          "blockNumber": 119602273,
+          "blockHash": "0xf9c4cd7a2cd53611698d06bde99d302442534a8aa8734984198673d47d70f9e8",
+          "timestamp": 1789426785
+        },
+        "targetRound": 32207808,
+        "targetRoundTime": 1789426788,
+        "strictlyAfterBoundary": true,
+        "officialBeaconUrl": "https://api.drand.sh/52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971/public/32207808",
+        "officialApiRandomness": "0x60fcd01ecb0d1c0b853b0689174193dc3adcd1203d5a7b4c0943c56a29321f39",
+        "officialCompressedProofKeccak256": "0xa994b92b7f1919e2ad891714913d5be849e5695634778569842b3eeb3e52ffbf",
+        "submittedProofKeccak256": "0x0f7cc6ac847f237ff43fa1e0c25922e2be18f6ed1ed420ef52571e65448057d3",
+        "canonicalPointKeccak256": "0x0f7cc6ac847f237ff43fa1e0c25922e2be18f6ed1ed420ef52571e65448057d3",
+        "registryRandomness": "0x356b1ff84ac12573a385fd8ae3622fc3cf6656dd9cad439af70073b79eb77aac",
+        "postedAt": 1789426842,
+        "transactionHash": "0x1b70f4f2e0fef5df8b181921e0742c8511d333bd33af1a88effed8eb038a50c9",
+        "blockNumber": 119602676,
+        "blockHash": "0x13c9f5f3680a0b5fe7de09b7ab24b170a57c86a1230e6bf00c06b4565e31a141",
+        "gasUsed": 217779,
+        "status": "success"
+      }
+    ],
+    "representationEquivalence": {
+      "round": 32207808,
+      "compressedVerification": "success",
+      "uncompressedVerification": "success",
+      "canonicalPointEqual": true,
+      "registryRandomnessEqual": true,
+      "registryRandomness": "0x356b1ff84ac12573a385fd8ae3622fc3cf6656dd9cad439af70073b79eb77aac"
+    }
+  },
+  "formalReconciliation": {
+    "deployedRuntimeMatchesVerifiedRuntime": true,
+    "concreteAssumptionsExercised": [
+      "EIP-198 modular exponentiation",
+      "EIP-2537 map FP to G1",
+      "EIP-2537 G1 addition",
+      "EIP-2537 pairing",
+      "compressed G1 parsing and decompression",
+      "uncompressed G1 validation",
+      "canonical point normalization",
+      "round-bound randomness derivation"
+    ],
+    "evidenceBoundary": "Runtime validation exercises concrete target-client behavior; it is separate from and does not expand the formal proof claim."
+  },
+  "explorerSourceVerification": "waived for throwaway testnet deployment"
+}

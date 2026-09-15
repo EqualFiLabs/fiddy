@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.30;
 
-import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
 import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
 
 import { IEqualFiDrandRegistry } from "../interfaces/IEqualFiDrandRegistry.sol";
@@ -95,15 +94,31 @@ contract SettlementFacet is ISettlement {
         view
         returns (SettlementAmounts memory amounts)
     {
-        uint256 gross = round.receipts;
-        amounts.winner = Math.mulDiv(gross, round.config.winnerBps, BPS_DENOMINATOR);
-        uint256 protocolAmount = gross - amounts.winner;
-        amounts.operator =
-            Math.mulDiv(protocolAmount, round.config.operatorProtocolBps, BPS_DENOMINATOR);
-        uint256 treasuryGross = protocolAmount - amounts.operator;
-        amounts.finalizer =
-            round.config.finalizerTip < treasuryGross ? round.config.finalizerTip : treasuryGross;
-        amounts.treasury = treasuryGross - amounts.finalizer;
+        return _allocateValues(
+            round.receipts.toUint128(),
+            round.config.winnerBps,
+            round.config.operatorProtocolBps,
+            round.config.finalizerTip
+        );
+    }
+
+    function _allocateValues(
+        uint128 gross,
+        uint16 winnerBps,
+        uint16 operatorProtocolBps,
+        uint96 finalizerTip
+    ) internal pure returns (SettlementAmounts memory amounts) {
+        // Reachable receipts are bounded by uint96 ticket price * uint32 ticket count. Config
+        // validation also caps both BPS values at the denominator. Under those invariants every
+        // multiplication and subtraction below is safe; the live caller checks the gross cast.
+        unchecked {
+            amounts.winner = uint256(gross) * winnerBps / BPS_DENOMINATOR;
+            uint256 protocolAmount = uint256(gross) - amounts.winner;
+            amounts.operator = protocolAmount * operatorProtocolBps / BPS_DENOMINATOR;
+            uint256 treasuryGross = protocolAmount - amounts.operator;
+            amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
+            amounts.treasury = treasuryGross - amounts.finalizer;
+        }
     }
 
     function _recordSettlement(
@@ -113,13 +128,14 @@ contract SettlementFacet is ISettlement {
         address winner,
         bytes32 applicationSeed,
         SettlementAmounts memory amounts
-    ) private {
+    ) internal {
         round.status = RoundStatus.Settled;
         round.settledAt = block.timestamp.toUint64();
         round.winningTicket = winningTicket;
         round.winner = winner;
         round.applicationSeed = applicationSeed;
         round.winnerClaimable = amounts.winner;
+        gs.activeRoundForConfig[round.configVersion] = 0;
         --gs.activeRoundCount;
 
         address paymentToken = round.config.paymentToken;
