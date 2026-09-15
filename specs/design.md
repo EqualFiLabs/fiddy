@@ -1143,8 +1143,13 @@ struct AccountingStorage {
     mapping(address asset => AssetAccounting accounting) assetAccounting;
     mapping(uint64 integrationVersion => mapping(address asset => uint256 amount)) pendingOperatorRevenue;
     mapping(address asset => mapping(address finalizer => uint256 amount)) finalizerCredits;
+    mapping(address asset => bool admitted) admittedPaymentToken;
 }
 ```
+
+This is the deployed append-only field order for the
+`statics.lottery.storage.accounting.v1` namespace. Future upgrades must preserve it exactly and
+append any new members only after `admittedPaymentToken`.
 
 ## Governance Storage
 
