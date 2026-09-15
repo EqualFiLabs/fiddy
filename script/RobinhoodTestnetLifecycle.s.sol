@@ -17,6 +17,7 @@ import { ILotteryView } from "../src/interfaces/ILotteryView.sol";
 import { IRevenue } from "../src/interfaces/IRevenue.sol";
 import { ISettlement } from "../src/interfaces/ISettlement.sol";
 import { FacetCut, FacetCutAction } from "../src/shared/DiamondTypes.sol";
+import { Errors } from "../src/shared/Errors.sol";
 import { AssetAccounting, LotteryConfig, Round, RoundStatus } from "../src/shared/Types.sol";
 
 interface IWeth is IERC20 {
@@ -251,11 +252,17 @@ contract ConfirmFinalizedCutFailure is RobinhoodTestnetLifecycleScript {
         FacetCut[] memory cuts = new FacetCut[](0);
 
         vm.startBroadcast(key);
-        (bool success,) =
-            DIAMOND.call(abi.encodeCall(IDiamondCut.diamondCut, (cuts, address(0), "")));
+        (bool success, bytes memory reason) = DIAMOND.call{ gas: 100_000 }(
+            abi.encodeCall(IDiamondCut.diamondCut, (cuts, address(0), ""))
+        );
         vm.stopBroadcast();
 
         _assert(!success, "finalized cut unexpectedly succeeded");
+        _assert(reason.length >= 4, "missing cut failure data");
+        // Truncation is intentional after proving the returndata contains an error selector.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        bytes4 revertSelector = bytes4(reason);
+        _assert(revertSelector == Errors.CutsDisabled.selector, "unexpected cut failure");
     }
 }
 
