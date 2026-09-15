@@ -31,6 +31,7 @@ chain_id=$($cast_bin chain-id --rpc-url "$ROBINHOOD_TESTNET")
 assert_equal "$chain_id" "$(jq -r '.network.chainId' "$manifest")" "chain ID"
 
 diamond=$(jq -r '.deployment.diamond.address' "$manifest")
+state_block=$(jq -r '.deployment.initialCut.blockNumber' "$manifest")
 assert_code_hash \
     "$diamond" \
     "$(jq -r '.deployment.diamond.runtimeKeccak256' "$manifest")" \
@@ -48,7 +49,7 @@ while IFS= read -r encoded_facet; do
 
     live_selectors=$(
         $cast_bin call "$diamond" 'facetFunctionSelectors(address)(bytes4[])' \
-            "$address" --rpc-url "$ROBINHOOD_TESTNET" --json \
+            "$address" --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" --json \
             | jq -c '.[0] | map(ascii_downcase)'
     )
     expected_selectors=$(jq -c '.selectors | map(ascii_downcase)' <<<"$facet")
@@ -57,55 +58,55 @@ done < <(jq -r '.deployment.facets[] | @base64' "$manifest")
 
 live_facet_addresses=$(
     $cast_bin call "$diamond" 'facetAddresses()(address[])' \
-        --rpc-url "$ROBINHOOD_TESTNET" --json \
+        --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" --json \
         | jq -c '.[0] | map(ascii_downcase)'
 )
 expected_facet_addresses=$(jq -c '[.deployment.facets[].address | ascii_downcase]' "$manifest")
 assert_equal "$live_facet_addresses" "$expected_facet_addresses" "facet address list"
 
 assert_equal \
-    "$($cast_bin call "$diamond" 'guardian()(address)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'guardian()(address)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.roles.guardian' "$manifest")" \
     "guardian"
 assert_equal \
-    "$($cast_bin call "$diamond" 'treasuryRecipient()(address)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'treasuryRecipient()(address)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.roles.treasuryRecipient' "$manifest")" \
     "Treasury recipient"
 authority=$(jq -r '.roles.authority' "$manifest")
 $cast_bin call "$diamond" 'setMaxActiveRounds(uint16)' \
     "$(jq -r '.initialState.maxActiveRounds' "$manifest")" \
-    --from "$authority" --rpc-url "$ROBINHOOD_TESTNET" >/dev/null
+    --from "$authority" --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" >/dev/null
 if $cast_bin call "$diamond" 'setMaxActiveRounds(uint16)' \
     "$(jq -r '.initialState.maxActiveRounds' "$manifest")" \
     --from 0x0000000000000000000000000000000000000001 \
-    --rpc-url "$ROBINHOOD_TESTNET" >/dev/null 2>&1; then
+    --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" >/dev/null 2>&1; then
     echo "Unauthorized authority probe unexpectedly succeeded" >&2
     exit 1
 fi
 assert_equal \
-    "$($cast_bin call "$diamond" 'maxActiveRounds()(uint16)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'maxActiveRounds()(uint16)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.initialState.maxActiveRounds' "$manifest")" \
     "maximum active Rounds"
 assert_equal \
-    "$($cast_bin call "$diamond" 'activeRoundCount()(uint256)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'activeRoundCount()(uint256)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.initialState.activeRoundCount' "$manifest")" \
     "active Round count"
 assert_equal \
-    "$($cast_bin call "$diamond" 'latestRoundId()(uint256)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'latestRoundId()(uint256)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.initialState.latestRoundId' "$manifest")" \
     "latest Round ID"
 assert_equal \
-    "$($cast_bin call "$diamond" 'paused()(bool)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'paused()(bool)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.initialState.paused' "$manifest")" \
     "pause state"
 assert_equal \
-    "$($cast_bin call "$diamond" 'protocolFinalized()(bool)' --rpc-url "$ROBINHOOD_TESTNET")" \
+    "$($cast_bin call "$diamond" 'protocolFinalized()(bool)' --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET")" \
     "$(jq -r '.initialState.protocolFinalized' "$manifest")" \
     "finalization state"
 
 integration=$(
     $cast_bin call "$diamond" 'currentIntegration()((address,address),uint64)' \
-        --rpc-url "$ROBINHOOD_TESTNET" --json
+        --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" --json
 )
 assert_equal \
     "$(jq -r '.[0][0]' <<<"$integration")" \
@@ -126,7 +127,7 @@ while IFS= read -r encoded_config; do
     live=$(
         $cast_bin call "$diamond" \
             'lotteryConfig(uint64)((address,uint96,uint32,uint32,uint32,uint32,uint16,uint16,uint96),bool)' \
-            "$version" --rpc-url "$ROBINHOOD_TESTNET" --json
+            "$version" --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" --json
     )
     fields=(
         paymentToken ticketPrice ticketCount salesDuration randomnessDelay
