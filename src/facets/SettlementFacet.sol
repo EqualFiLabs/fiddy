@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity 0.8.30;
+
+import { Math } from "openzeppelin-contracts/contracts/utils/math/Math.sol";
+import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.sol";
+
+import { IEqualFiDrandRegistry } from "../interfaces/IEqualFiDrandRegistry.sol";
+import { ISettlement } from "../interfaces/ISettlement.sol";
+import { LibLotteryStorage } from "../libraries/LibLotteryStorage.sol";
+import { LibReentrancy } from "../libraries/LibReentrancy.sol";
+import { LibTicketRanges } from "../libraries/LibTicketRanges.sol";
+import { Errors } from "../shared/Errors.sol";
+import { AssetAccounting, IntegrationConfig, Round, RoundStatus } from "../shared/Types.sol";
+
+contract SettlementFacet is ISettlement {
+    using SafeCast for uint256;
+
+    uint256 internal constant BPS_DENOMINATOR = 10_000;
+
+    struct SettlementAmounts {
+        uint256 winner;
+        uint256 operator;
+        uint256 treasury;
+        uint256 finalizer;
+    }
+
+    modifier nonReentrant() {
+        LibReentrancy.enter();
+        _;
+        LibReentrancy.exit();
+    }
+
+    function settleRound(uint256 roundId, bytes calldata quicknetSignature)
+        external
+        nonReentrant
+        returns (uint32 winningTicket, address winner)
+    {
+        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
+        Round storage round = gs.rounds[roundId];
+        if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
+        if (round.status != RoundStatus.SoldOut || round.drandRound == 0) {
+            revert Errors.RoundNotSoldOut(roundId);
+        }
+
+        bytes32 applicationSeed = _acquireApplicationSeed(round, roundId, quicknetSignature);
+        winningTicket = (uint256(applicationSeed) % round.config.ticketCount).toUint32();
+        winner = LibTicketRanges.ownerOfTicket(gs.entries[roundId], winningTicket);
+        SettlementAmounts memory amounts = _allocate(round);
+
+        _recordSettlement(gs, round, winningTicket, winner, applicationSeed, amounts);
+
+        emit RoundSettled(
+            roundId,
+            winningTicket,
+            winner,
+            round.config.paymentToken,
+            msg.sender,
+            applicationSeed,
+            amounts.winner,
+            amounts.operator,
+            amounts.treasury,
+            amounts.finalizer
+        );
+    }
+
+    function _acquireApplicationSeed(
+        Round storage round,
+        uint256 roundId,
+        bytes calldata quicknetSignature
+    ) private returns (bytes32) {
+        IntegrationConfig storage integration = LibLotteryStorage.integrationStorage()
+        .integrations[round.integrationVersion];
+        IEqualFiDrandRegistry registry = IEqualFiDrandRegistry(integration.drandRegistry);
+        uint64 drandRound = round.drandRound;
+        if (!registry.hasSig(drandRound)) {
+            bool newlyStored = registry.postSig(drandRound, quicknetSignature);
+            if (!newlyStored && !registry.hasSig(drandRound)) {
+                revert Errors.RandomnessUnavailable(drandRound);
+            }
+        }
+        if (!registry.hasSig(drandRound)) revert Errors.RandomnessUnavailable(drandRound);
+
+        uint64 postedAt = registry.postedAt(drandRound);
+        if (postedAt <= round.selloutAt) {
+            revert Errors.RandomnessPredatesSellout(drandRound, postedAt, round.selloutAt);
+        }
+
+        return keccak256(
+            abi.encode(registry.randomnessOf(drandRound), block.chainid, address(this), roundId)
+        );
+    }
+
+    function _allocate(Round storage round)
+        private
+        view
+        returns (SettlementAmounts memory amounts)
+    {
+        uint256 gross = round.receipts;
+        amounts.winner = Math.mulDiv(gross, round.config.winnerBps, BPS_DENOMINATOR);
+        uint256 protocolAmount = gross - amounts.winner;
+        amounts.operator =
+            Math.mulDiv(protocolAmount, round.config.operatorProtocolBps, BPS_DENOMINATOR);
+        uint256 treasuryGross = protocolAmount - amounts.operator;
+        amounts.finalizer =
+            round.config.finalizerTip < treasuryGross ? round.config.finalizerTip : treasuryGross;
+        amounts.treasury = treasuryGross - amounts.finalizer;
+    }
+
+    function _recordSettlement(
+        LibLotteryStorage.GameStorage storage gs,
+        Round storage round,
+        uint32 winningTicket,
+        address winner,
+        bytes32 applicationSeed,
+        SettlementAmounts memory amounts
+    ) private {
+        round.status = RoundStatus.Settled;
+        round.settledAt = block.timestamp.toUint64();
+        round.winningTicket = winningTicket;
+        round.winner = winner;
+        round.applicationSeed = applicationSeed;
+        round.winnerClaimable = amounts.winner;
+        --gs.activeRoundCount;
+
+        address paymentToken = round.config.paymentToken;
+        LibLotteryStorage.AccountingStorage storage accountingStorage =
+            LibLotteryStorage.accountingStorage();
+        AssetAccounting storage accounting = accountingStorage.assetAccounting[paymentToken];
+        accounting.activeRoundEscrow -= round.receipts;
+        accounting.winnerLiability += amounts.winner;
+        accountingStorage.pendingOperatorRevenue[
+            round.integrationVersion
+        ][paymentToken] += amounts.operator;
+        accounting.pendingOperatorRevenueTotal += amounts.operator;
+        accounting.treasuryAvailable += amounts.treasury;
+        accountingStorage.finalizerCredits[paymentToken][msg.sender] += amounts.finalizer;
+        accounting.finalizerLiability += amounts.finalizer;
+    }
+}
