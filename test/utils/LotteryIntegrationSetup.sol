@@ -3,30 +3,28 @@ pragma solidity 0.8.30;
 
 import { Test } from "forge-std/Test.sol";
 import { ERC20 } from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import { SafeERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 import { StaticsLotteryDiamond } from "../../src/StaticsLotteryDiamond.sol";
 import { ClaimsFacet } from "../../src/facets/ClaimsFacet.sol";
 import { DiamondCutFacet } from "../../src/facets/DiamondCutFacet.sol";
 import { GovernanceFacet } from "../../src/facets/GovernanceFacet.sol";
 import { LotteryFacet } from "../../src/facets/LotteryFacet.sol";
+import { LotteryViewFacet } from "../../src/facets/LotteryViewFacet.sol";
+import { RevenueFacet } from "../../src/facets/RevenueFacet.sol";
 import { SettlementFacet } from "../../src/facets/SettlementFacet.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
 import { IClaims } from "../../src/interfaces/IClaims.sol";
 import { IEqualFiDrandRegistry } from "../../src/interfaces/IEqualFiDrandRegistry.sol";
 import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { ILottery } from "../../src/interfaces/ILottery.sol";
+import { ILotteryView } from "../../src/interfaces/ILotteryView.sol";
+import { IRevenue } from "../../src/interfaces/IRevenue.sol";
 import { ISettlement } from "../../src/interfaces/ISettlement.sol";
-import { LibLotteryStorage } from "../../src/libraries/LibLotteryStorage.sol";
 import { LibReentrancy } from "../../src/libraries/LibReentrancy.sol";
-import { LibTicketRanges } from "../../src/libraries/LibTicketRanges.sol";
 import { FacetCut, FacetCutAction } from "../../src/shared/DiamondTypes.sol";
-import {
-    AssetAccounting,
-    IntegrationConfig,
-    LotteryConfig,
-    Round,
-    TicketRange
-} from "../../src/shared/Types.sol";
+import { IntegrationConfig, LotteryConfig, Round } from "../../src/shared/Types.sol";
 
 contract IntegrationToken is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) { }
@@ -98,59 +96,71 @@ contract ConfiguredDrandRegistry is IEqualFiDrandRegistry {
     }
 }
 
-contract IntegrationEndpoint { }
+contract IntegrationEndpoint {
+    using SafeERC20 for IERC20;
+
+    bool public bootstrapFinalized = true;
+    uint256 public totalEffectiveWeight = 1;
+    bool public rejectRewards;
+    bool public rejectLiabilityCapacity;
+    bool public rejectIndexCapacity;
+    mapping(address asset => bool registered) internal registeredAssets;
+    mapping(address asset => bool enabled) internal enabledAssets;
+    mapping(address asset => uint256 amount) public totalAdded;
+
+    error RewardsRejected();
+    error RewardLiabilityLimitExceeded(
+        address asset, uint256 currentLiability, uint256 amount, uint256 limit
+    );
+    error RewardIndexCapacityExceeded(address asset);
+
+    function setBootstrapFinalized(bool finalized) external {
+        bootstrapFinalized = finalized;
+    }
+
+    function setTotalEffectiveWeight(uint256 weight) external {
+        totalEffectiveWeight = weight;
+    }
+
+    function setAsset(address asset, bool registered, bool enabled) external {
+        registeredAssets[asset] = registered;
+        enabledAssets[asset] = enabled;
+    }
+
+    function setRejectRewards(bool rejected) external {
+        rejectRewards = rejected;
+    }
+
+    function setRejectLiabilityCapacity(bool rejected) external {
+        rejectLiabilityCapacity = rejected;
+    }
+
+    function setRejectIndexCapacity(bool rejected) external {
+        rejectIndexCapacity = rejected;
+    }
+
+    function isRewardAsset(address asset) external view returns (bool) {
+        return registeredAssets[asset];
+    }
+
+    function rewardAssetEnabled(address asset) external view returns (bool) {
+        return enabledAssets[asset];
+    }
+
+    function addRewards(address asset, uint256 amount) external {
+        if (rejectRewards) revert RewardsRejected();
+        if (rejectLiabilityCapacity) {
+            revert RewardLiabilityLimitExceeded(asset, type(uint96).max, amount, type(uint96).max);
+        }
+        if (rejectIndexCapacity) revert RewardIndexCapacityExceeded(asset);
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        totalAdded[asset] += amount;
+    }
+}
 
 contract IntegrationInitializer {
     function initialize() external {
         LibReentrancy.initialize();
-    }
-}
-
-contract IntegrationStateFacet {
-    function roundState(uint256 roundId) external view returns (Round memory) {
-        return LibLotteryStorage.gameStorage().rounds[roundId];
-    }
-
-    function activeRoundCount() external view returns (uint256) {
-        return LibLotteryStorage.gameStorage().activeRoundCount;
-    }
-
-    function refundCredit(uint256 roundId, address account) external view returns (uint256) {
-        return LibLotteryStorage.gameStorage().refundCredit[roundId][account];
-    }
-
-    function purchaseEntryCount(uint256 roundId) external view returns (uint256) {
-        return LibLotteryStorage.gameStorage().entries[roundId].length;
-    }
-
-    function purchaseEntry(uint256 roundId, uint256 index)
-        external
-        view
-        returns (TicketRange memory)
-    {
-        return LibLotteryStorage.gameStorage().entries[roundId][index];
-    }
-
-    function ticketOwner(uint256 roundId, uint32 ticket) external view returns (address) {
-        return
-            LibTicketRanges.ownerOfTicket(LibLotteryStorage.gameStorage().entries[roundId], ticket);
-    }
-
-    function assetAccounting(address asset) external view returns (AssetAccounting memory) {
-        return LibLotteryStorage.accountingStorage().assetAccounting[asset];
-    }
-
-    function pendingOperatorRevenue(uint64 integrationVersion, address asset)
-        external
-        view
-        returns (uint256)
-    {
-        return
-            LibLotteryStorage.accountingStorage().pendingOperatorRevenue[integrationVersion][asset];
-    }
-
-    function finalizerCredit(address asset, address account) external view returns (uint256) {
-        return LibLotteryStorage.accountingStorage().finalizerCredits[asset][account];
     }
 }
 
@@ -167,7 +177,8 @@ abstract contract LotteryIntegrationSetup is Test {
     ILottery internal lottery;
     ISettlement internal settlement;
     IClaims internal claims;
-    IntegrationStateFacet internal stateView;
+    IRevenue internal revenue;
+    ILotteryView internal stateView;
     IntegrationToken internal tokenA;
     IntegrationToken internal tokenB;
     ConfiguredDrandRegistry internal registry;
@@ -181,15 +192,17 @@ abstract contract LotteryIntegrationSetup is Test {
         LotteryFacet lotteryFacet = new LotteryFacet();
         SettlementFacet settlementFacet = new SettlementFacet();
         ClaimsFacet claimsFacet = new ClaimsFacet();
-        IntegrationStateFacet viewFacet = new IntegrationStateFacet();
+        RevenueFacet revenueFacet = new RevenueFacet();
+        LotteryViewFacet viewFacet = new LotteryViewFacet();
         IntegrationInitializer initializer = new IntegrationInitializer();
 
-        FacetCut[] memory cuts = new FacetCut[](5);
+        FacetCut[] memory cuts = new FacetCut[](6);
         cuts[0] = _cut(address(governanceFacet), _governanceSelectors());
         cuts[1] = _cut(address(lotteryFacet), _lotterySelectors());
         cuts[2] = _cut(address(settlementFacet), _settlementSelectors());
         cuts[3] = _cut(address(claimsFacet), _claimsSelectors());
-        cuts[4] = _cut(address(viewFacet), _stateSelectors());
+        cuts[4] = _cut(address(revenueFacet), _revenueSelectors());
+        cuts[5] = _cut(address(viewFacet), _stateSelectors());
         vm.prank(authority);
         IDiamondCut(address(diamond))
             .diamondCut(
@@ -200,11 +213,14 @@ abstract contract LotteryIntegrationSetup is Test {
         lottery = ILottery(address(diamond));
         settlement = ISettlement(address(diamond));
         claims = IClaims(address(diamond));
-        stateView = IntegrationStateFacet(address(diamond));
+        revenue = IRevenue(address(diamond));
+        stateView = ILotteryView(address(diamond));
         tokenA = new IntegrationToken("Payment A", "PAYA");
         tokenB = new IntegrationToken("Payment B", "PAYB");
         registry = new ConfiguredDrandRegistry();
         router = new IntegrationEndpoint();
+        router.setAsset(address(tokenA), true, true);
+        router.setAsset(address(tokenB), true, true);
 
         vm.startPrank(authority);
         governance.setIntegrationConfig(IntegrationConfig(address(registry), address(router)));
@@ -231,7 +247,7 @@ abstract contract LotteryIntegrationSetup is Test {
     }
 
     function _prepareProof(uint256 roundId, bytes memory proof) internal {
-        Round memory round = stateView.roundState(roundId);
+        Round memory round = stateView.round(roundId);
         registry.expectProof(round.drandRound, proof);
         vm.warp(registry.roundTime(round.drandRound));
     }
@@ -307,16 +323,32 @@ abstract contract LotteryIntegrationSetup is Test {
         selectors[2] = IClaims.claimFinalizerTips.selector;
     }
 
+    function _revenueSelectors() internal pure returns (bytes4[] memory selectors) {
+        selectors = new bytes4[](5);
+        selectors[0] = IRevenue.flushOperatorRevenue.selector;
+        selectors[1] = IRevenue.flushTreasury.selector;
+        selectors[2] = IRevenue.availableTokenSurplus.selector;
+        selectors[3] = IRevenue.absorbTokenSurplus.selector;
+        selectors[4] = IRevenue.flushNativeSurplus.selector;
+    }
+
     function _stateSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](9);
-        selectors[0] = IntegrationStateFacet.roundState.selector;
-        selectors[1] = IntegrationStateFacet.activeRoundCount.selector;
-        selectors[2] = IntegrationStateFacet.refundCredit.selector;
-        selectors[3] = IntegrationStateFacet.purchaseEntryCount.selector;
-        selectors[4] = IntegrationStateFacet.purchaseEntry.selector;
-        selectors[5] = IntegrationStateFacet.ticketOwner.selector;
-        selectors[6] = IntegrationStateFacet.assetAccounting.selector;
-        selectors[7] = IntegrationStateFacet.pendingOperatorRevenue.selector;
-        selectors[8] = IntegrationStateFacet.finalizerCredit.selector;
+        selectors = new bytes4[](16);
+        selectors[0] = ILotteryView.latestLotteryConfigVersion.selector;
+        selectors[1] = ILotteryView.latestRoundId.selector;
+        selectors[2] = ILotteryView.round.selector;
+        selectors[3] = ILotteryView.roundConfig.selector;
+        selectors[4] = ILotteryView.ticketOwner.selector;
+        selectors[5] = ILotteryView.purchaseEntryCount.selector;
+        selectors[6] = ILotteryView.purchaseEntry.selector;
+        selectors[7] = ILotteryView.refundableAmount.selector;
+        selectors[8] = ILotteryView.lotteryConfig.selector;
+        selectors[9] = ILotteryView.currentIntegration.selector;
+        selectors[10] = ILotteryView.integrationAt.selector;
+        selectors[11] = ILotteryView.activeRoundCount.selector;
+        selectors[12] = ILotteryView.maxActiveRounds.selector;
+        selectors[13] = ILotteryView.pendingOperatorRevenue.selector;
+        selectors[14] = ILotteryView.assetAccounting.selector;
+        selectors[15] = ILotteryView.finalizerCredit.selector;
     }
 }

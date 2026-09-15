@@ -28,6 +28,7 @@ library Errors {
     error NotGuardian(address caller);
     error NotWinner(address caller);
     error ProtocolPaused();
+    error PurchaseEntryNotFound(uint256 roundId, uint256 index);
     error RandomnessPredatesSellout(uint64 drandRound, uint64 postedAt, uint64 selloutAt);
     error RandomnessUnavailable(uint64 drandRound);
     error Reentrancy();
@@ -43,7 +44,15 @@ library Errors {
     error StaleRandomnessRound(uint64 drandRound);
     error TicketLimitExceeded();
     error IntegrationNotConfigured();
+    error IntegrationNotFound(uint64 version);
+    error InsufficientOperatorRevenue(uint64 version, uint256 requested, uint256 available);
+    error InsufficientTreasuryBalance(uint256 requested, uint256 available);
+    error NativeTransferFailed();
+    error NoNativeSurplus();
+    error NoTokenSurplus();
+    error OperatorRouterUnavailable(address router, address asset);
     error UnexpectedInitializationData();
     error UnpauseRequiresAuthority(address caller);
+    error ZeroAmount();
     error InexactTokenTransfer(address asset, uint256 expected, uint256 spent, uint256 received);
 }

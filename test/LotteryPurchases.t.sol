@@ -2,6 +2,7 @@
 pragma solidity 0.8.30;
 
 import { Test } from "forge-std/Test.sol";
+import { IERC20Errors } from "openzeppelin-contracts/contracts/interfaces/draft-IERC6093.sol";
 import { ERC20 } from "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 import { StaticsLotteryDiamond } from "../src/StaticsLotteryDiamond.sol";
@@ -31,6 +32,51 @@ contract LifecycleToken is ERC20 {
 
     function mint(address receiver, uint256 amount) external {
         _mint(receiver, amount);
+    }
+}
+
+contract LifecycleReceiverFeeToken is LifecycleToken {
+    constructor() LifecycleToken("Receiver Fee", "RFEE") { }
+
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0) && to != address(0) && value != 0) {
+            super._update(from, to, value - 1);
+            super._update(from, address(0), 1);
+        } else {
+            super._update(from, to, value);
+        }
+    }
+}
+
+contract LifecycleSenderFeeToken is LifecycleToken {
+    constructor() LifecycleToken("Sender Fee", "SFEE") { }
+
+    function _update(address from, address to, uint256 value) internal override {
+        super._update(from, to, value);
+        if (from != address(0) && to != address(0) && value != 0) {
+            super._update(from, address(0), 1);
+        }
+    }
+}
+
+contract LifecycleReentrantToken is LifecycleToken {
+    address internal target;
+    uint256 internal attackedRound;
+    bool internal attackEnabled;
+
+    constructor() LifecycleToken("Reentrant Token", "REENTER") { }
+
+    function configureAttack(address target_, uint256 roundId) external {
+        target = target_;
+        attackedRound = roundId;
+        attackEnabled = true;
+    }
+
+    function _update(address from, address to, uint256 value) internal override {
+        super._update(from, to, value);
+        if (attackEnabled && to == target && from != address(0)) {
+            ILottery(target).buyTickets(attackedRound, 1);
+        }
     }
 }
 
@@ -92,7 +138,23 @@ contract InvalidScheduleRegistry is IEqualFiDrandRegistry {
     }
 }
 
-contract LifecycleEndpoint { }
+contract LifecycleEndpoint {
+    function bootstrapFinalized() external pure returns (bool) {
+        return true;
+    }
+
+    function totalEffectiveWeight() external pure returns (uint256) {
+        return 1;
+    }
+
+    function isRewardAsset(address) external pure returns (bool) {
+        return true;
+    }
+
+    function rewardAssetEnabled(address) external pure returns (bool) {
+        return true;
+    }
+}
 
 contract LifecycleInitializer {
     function initialize() external {
@@ -428,6 +490,110 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 0);
     }
 
+    function test_InsufficientAllowanceAndBalanceRollbackRoundOpening() public {
+        vm.prank(alice);
+        tokenA.approve(address(diamond), 19);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IERC20Errors.ERC20InsufficientAllowance.selector, address(diamond), 19, 20
+            )
+        );
+        vm.prank(alice);
+        lottery.openRound(1, 2);
+
+        assertEq(stateView.activeRoundCount(), 0);
+        assertEq(uint8(stateView.roundState(1).status), uint8(RoundStatus.None));
+        assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 0);
+
+        vm.prank(alice);
+        tokenA.approve(address(diamond), type(uint256).max);
+        vm.prank(alice);
+        tokenA.transfer(bob, 995);
+        vm.expectRevert(
+            abi.encodeWithSelector(IERC20Errors.ERC20InsufficientBalance.selector, alice, 5, 10)
+        );
+        vm.prank(alice);
+        lottery.openRound(1, 1);
+
+        assertEq(stateView.activeRoundCount(), 0);
+        assertEq(uint8(stateView.roundState(1).status), uint8(RoundStatus.None));
+        assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 0);
+    }
+
+    function test_InexactInboundTokensRollbackTicketsAndAccounting() public {
+        LifecycleReceiverFeeToken receiverFee = new LifecycleReceiverFeeToken();
+        uint64 receiverFeeVersion = _addTokenConfig(address(receiverFee));
+        receiverFee.mint(alice, 100);
+        vm.prank(alice);
+        receiverFee.approve(address(diamond), type(uint256).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InexactTokenTransfer.selector, address(receiverFee), 20, 20, 19
+            )
+        );
+        vm.prank(alice);
+        lottery.openRound(receiverFeeVersion, 2);
+        assertEq(receiverFee.balanceOf(alice), 100);
+        assertEq(receiverFee.balanceOf(address(diamond)), 0);
+        assertEq(stateView.assetAccounting(address(receiverFee)).activeRoundEscrow, 0);
+
+        LifecycleSenderFeeToken senderFee = new LifecycleSenderFeeToken();
+        uint64 senderFeeVersion = _addTokenConfig(address(senderFee));
+        senderFee.mint(alice, 100);
+        vm.prank(alice);
+        senderFee.approve(address(diamond), type(uint256).max);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Errors.InexactTokenTransfer.selector, address(senderFee), 20, 21, 20
+            )
+        );
+        vm.prank(alice);
+        lottery.openRound(senderFeeVersion, 2);
+        assertEq(senderFee.balanceOf(alice), 100);
+        assertEq(senderFee.balanceOf(address(diamond)), 0);
+        assertEq(stateView.assetAccounting(address(senderFee)).activeRoundEscrow, 0);
+        assertEq(stateView.activeRoundCount(), 0);
+        assertEq(uint8(stateView.roundState(1).status), uint8(RoundStatus.None));
+    }
+
+    function test_RejectsPurchasesBeyondRemainingSupplyWithoutMutation() public {
+        vm.prank(alice);
+        uint256 roundId = lottery.openRound(1, 5);
+
+        vm.expectRevert(Errors.InvalidTicketQuantity.selector);
+        vm.prank(bob);
+        lottery.buyTickets(roundId, 6);
+
+        Round memory round = stateView.roundState(roundId);
+        assertEq(round.soldTickets, 5);
+        assertEq(round.receipts, 50);
+        assertEq(stateView.purchaseEntryCount(roundId), 1);
+        assertEq(stateView.refundCredit(roundId, bob), 0);
+        assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 50);
+    }
+
+    function test_ReentrantPaymentTokenCannotCreateOrMutateRound() public {
+        LifecycleReentrantToken token = new LifecycleReentrantToken();
+        uint64 version = _addTokenConfig(address(token));
+        token.mint(alice, 100);
+        vm.prank(alice);
+        token.approve(address(diamond), type(uint256).max);
+        token.configureAttack(address(diamond), 1);
+
+        vm.expectRevert(Errors.Reentrancy.selector);
+        vm.prank(alice);
+        lottery.openRound(version, 2);
+
+        assertEq(stateView.activeRoundCount(), 0);
+        assertEq(uint8(stateView.roundState(1).status), uint8(RoundStatus.None));
+        assertEq(stateView.refundCredit(1, alice), 0);
+        assertEq(stateView.assetAccounting(address(token)).activeRoundEscrow, 0);
+        assertEq(token.balanceOf(alice), 100);
+        assertEq(token.balanceOf(address(diamond)), 0);
+    }
+
     function test_GovernanceChangesDoNotAlterOpenRoundSnapshotOrPurchasing() public {
         vm.prank(alice);
         uint256 roundId = lottery.openRound(1, 2);
@@ -549,6 +715,13 @@ contract LotteryPurchasesTest is Test {
         token.mint(account, 1000);
         vm.prank(account);
         token.approve(address(diamond), type(uint256).max);
+    }
+
+    function _addTokenConfig(address paymentToken) private returns (uint64 version) {
+        vm.startPrank(authority);
+        version = governance.createLotteryConfig(_config(paymentToken, 10, 10, 5, 1 days, 30));
+        governance.setLotteryConfigEnabled(version, true);
+        vm.stopPrank();
     }
 
     function _config(
