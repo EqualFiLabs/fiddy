@@ -22,6 +22,10 @@ scalar_call() {
     $cast_bin call "$@" --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" | awk '{print $1}'
 }
 
+cast_json_payload() {
+    jq -c 'if type == "object" and has("data") then .data else . end'
+}
+
 assert_code_hash() {
     local address=$1
     local expected=$2
@@ -228,7 +232,10 @@ while IFS= read -r encoded_beacon; do
 done < <(jq -r '.quicknet[] | @base64' "$manifest")
 
 failure_tx=$(jq -r '.operatorRouting.unavailableWethProbe.transactionHash' "$manifest")
-failure_receipt=$($cast_bin receipt "$failure_tx" --rpc-url "$ROBINHOOD_TESTNET" --json)
+failure_receipt=$(
+    $cast_bin receipt "$failure_tx" --rpc-url "$ROBINHOOD_TESTNET" --json \
+        | cast_json_payload
+)
 failure_log=$(
     jq -c --arg address "${flush_probe,,}" \
         '.logs[] | select((.address | ascii_downcase) == $address)' <<<"$failure_receipt"
@@ -242,7 +249,8 @@ assert_equal \
     "${weth,,}" \
     "Operator failure asset topic"
 decoded_failure=$(
-    $cast_bin decode-abi 'decode()(uint256,bytes)' "$(jq -r '.data' <<<"$failure_log")" --json
+    $cast_bin decode-abi 'decode()(uint256,bytes)' "$(jq -r '.data' <<<"$failure_log")" --json \
+        | cast_json_payload
 )
 assert_equal \
     "$(jq -r '.[0]' <<<"$decoded_failure")" \
@@ -256,7 +264,10 @@ assert_equal \
 while IFS= read -r encoded_transaction; do
     expected=$(base64 --decode <<<"$encoded_transaction")
     transaction_hash=$(jq -r '.hash' <<<"$expected")
-    receipt=$($cast_bin receipt "$transaction_hash" --rpc-url "$ROBINHOOD_TESTNET" --json)
+    receipt=$(
+        $cast_bin receipt "$transaction_hash" --rpc-url "$ROBINHOOD_TESTNET" --json \
+            | cast_json_payload
+    )
     assert_equal \
         "$(jq -r '.status' <<<"$receipt")" \
         "0x$(jq -r '.status' <<<"$expected")" \
@@ -269,7 +280,10 @@ while IFS= read -r encoded_transaction; do
         "$($cast_bin to-dec "$(jq -r '.gasUsed' <<<"$receipt")")" \
         "$(jq -r '.gasUsed' <<<"$expected")" \
         "transaction $transaction_hash gas"
-    block=$($cast_bin block "$(jq -r '.blockNumber' <<<"$receipt")" --rpc-url "$ROBINHOOD_TESTNET" --json)
+    block=$(
+        $cast_bin block "$(jq -r '.blockNumber' <<<"$receipt")" \
+            --rpc-url "$ROBINHOOD_TESTNET" --json | cast_json_payload
+    )
     assert_equal \
         "$($cast_bin to-dec "$(jq -r '.timestamp' <<<"$block")")" \
         "$(jq -r '.blockTimestamp' <<<"$expected")" \
@@ -277,7 +291,10 @@ while IFS= read -r encoded_transaction; do
 done < <(jq -r '.transactions[] | @base64' "$manifest")
 
 rejected_cut=$(jq -r '.transactions[] | select(.operation == "reject cut after finalization") | .hash' "$manifest")
-rejected_transaction=$($cast_bin tx "$rejected_cut" --rpc-url "$ROBINHOOD_TESTNET" --json)
+rejected_transaction=$(
+    $cast_bin tx "$rejected_cut" --rpc-url "$ROBINHOOD_TESTNET" --json \
+        | cast_json_payload
+)
 assert_equal "$(jq -r '.from' <<<"$rejected_transaction")" "$deployer" "rejected cut caller"
 assert_equal "$(jq -r '.to' <<<"$rejected_transaction")" "$diamond" "rejected cut target"
 assert_equal \
