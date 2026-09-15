@@ -30,6 +30,27 @@ assert_code_hash() {
 chain_id=$($cast_bin chain-id --rpc-url "$ROBINHOOD_TESTNET")
 assert_equal "$chain_id" "$(jq -r '.network.chainId' "$manifest")" "chain ID"
 
+assert_equal \
+    "$(jq -r '.externalDependencies.operatorFeeRouter.operatorCollection' "$manifest")" \
+    "$(jq -r '.externalDependencies.staticsGenesisReplica.contracts.operatorCollection.address' "$manifest")" \
+    "Router Operator collection provenance"
+assert_equal \
+    "$(jq -r '.externalDependencies.operatorFeeRouter.activationRegistry' "$manifest")" \
+    "$(jq -r '.externalDependencies.staticsGenesisReplica.contracts.activationRegistry.address' "$manifest")" \
+    "Router activation registry provenance"
+assert_equal \
+    "$(jq -r '.externalDependencies.operatorFeeRouter.operatorVault' "$manifest")" \
+    "$(jq -r '.externalDependencies.staticsGenesisReplica.contracts.operatorVault.address' "$manifest")" \
+    "Router Operator vault provenance"
+assert_equal \
+    "$(jq -r '.externalDependencies.paymentTokens[] | select(.symbol == "WETH") | .address' "$manifest")" \
+    "$(jq -r '.externalDependencies.staticsGenesisReplica.contracts.weth.address' "$manifest")" \
+    "WETH provenance"
+assert_equal \
+    "$(jq -r '.externalDependencies.paymentTokens[] | select(.symbol == "STATICS") | .address' "$manifest")" \
+    "$(jq -r '.externalDependencies.staticsGenesisReplica.contracts.statics.address' "$manifest")" \
+    "STATICS provenance"
+
 diamond=$(jq -r '.deployment.diamond.address' "$manifest")
 state_block=$(jq -r '.deployment.initialCut.blockNumber' "$manifest")
 assert_code_hash \
@@ -151,6 +172,14 @@ assert_code_hash \
     "$registry" \
     "$(jq -r '.externalDependencies.drandRegistry.runtimeKeccak256' "$manifest")" \
     "drand Registry"
+
+while IFS= read -r encoded_dependency; do
+    dependency=$(base64 --decode <<<"$encoded_dependency")
+    assert_code_hash \
+        "$(jq -r '.value.address' <<<"$dependency")" \
+        "$(jq -r '.value.runtimeKeccak256' <<<"$dependency")" \
+        "Statics Genesis $(jq -r '.key' <<<"$dependency")"
+done < <(jq -r '.externalDependencies.staticsGenesisReplica.contracts | to_entries[] | @base64' "$manifest")
 
 router=$(jq -r '.externalDependencies.operatorFeeRouter.address' "$manifest")
 admin=$(jq -r '.externalDependencies.operatorFeeRouter.testnetAdmin.address' "$manifest")

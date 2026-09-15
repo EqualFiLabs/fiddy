@@ -21,6 +21,35 @@
     "model": "Disposable testnet EOA control for the bounded release rehearsal; not a production governance deployment"
   },
   "externalDependencies": {
+    "staticsGenesisReplica": {
+      "repository": "EqualFiLabs/statics",
+      "manifestCommit": "31e870900615197277bcccef6bfdb06dba452930",
+      "manifestPath": "deployments/robinhood-testnet-46630-rehearsal-20260903T033729Z.json",
+      "sourceCommit": "43018f109006aa2c2eef2808adc2aa74dfc9a6d4b",
+      "reuseBoundary": "Existing testnet contracts reused as Router dependencies and Lottery Payment Tokens; the Genesis launch was not replayed",
+      "contracts": {
+        "operatorCollection": {
+          "address": "0x6c9197347161FC140a209175849d443FeaAF509c",
+          "runtimeKeccak256": "0xec224f66ecfa265dd306c54b2b683ba96395cd8f822dd2d51f84a2bac9d62afa"
+        },
+        "activationRegistry": {
+          "address": "0x8cE462A801726FA030e06264f3423Be2Ae8d6414",
+          "runtimeKeccak256": "0xc4bf24efb6c99c95060186a30200b7ee952604d77b917d0dae2cde87e6419e82"
+        },
+        "operatorVault": {
+          "address": "0x8D3a32ddF8bD529EC847457eC79620D2870FFdc4",
+          "runtimeKeccak256": "0x34641b08c85d3dc3e9b94551cb3b7b8d3a664dd773504849aec07499db5bb660"
+        },
+        "weth": {
+          "address": "0x33e4191705c386532ba27cBF171Db86919200B94",
+          "runtimeKeccak256": "0x55f8ac53c64450f01880d8249fc5cb0c69c064e4bcb097ea80a02fff40485a7c"
+        },
+        "statics": {
+          "address": "0xb6Cc79B2d892798d8e469A1efBF0713Fc2e51f86",
+          "runtimeKeccak256": "0xe548428d65bf2a8cee29a63e8dfaaeda0b4d44294d80f67f7626e1da8b89be69"
+        }
+      }
+    },
     "drandRegistry": {
       "address": "0x61388A94B429A04cAC0357485c12F68f706d7b57",
       "runtimeKeccak256": "0xde08fa453cee52a32750e6ff4f736d28b2a4378494cc699e62d27eb44164c1fc",
@@ -31,6 +60,9 @@
       "runtimeKeccak256": "0x5a24031cd7a3a71fd9c284ce64a07ec9585a8e325c947342cdc5b68b600fd1b8",
       "sourceRepository": "EqualFiLabs/operator-fee-router",
       "sourceCommit": "f98a17780cb250ce28f446ab54eb078512fb2e0b",
+      "deploymentEvidenceCommit": "5454f935a2037453f5d2f819d64c864f16363df4",
+      "deploymentManifestPath": "deployments/46630/operator-fee-router-rehearsal.json",
+      "deploymentDocumentationPath": "docs/robinhood-testnet.md",
       "compiler": "0.8.33+commit.64118f21",
       "evmVersion": "cancun",
       "optimizerRuns": 200,
