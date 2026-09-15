@@ -49,6 +49,7 @@ These results do not remove the explicit trust assumptions and production-deploy
 | Accounting-only settlement | Settlement records terminal state and token-denominated liabilities without transferring the Payment Token or depending on winner, Treasury, Router, or claimant cooperation. |
 | Exact ERC-20 accounting | Ingress and egress validate both sender spend and recipient receipt. Liabilities, escrow, revenue, refunds, and surplus remain scoped to the Round's admitted Payment Token. |
 | Concurrent token isolation | The lifecycle rehearsal ran concurrent WETH and STATICS Rounds and reconciled their independent settlement, claims, refund, Treasury, and Operator balances. |
+| External deployment provenance | The Lottery manifest pins the reused Statics Genesis source/manifest, five dependency runtimes, and the Router-owned deployment evidence; the composition document separates reused, fresh, exercised, and untested components. |
 | Retryable liability reduction | Winner, refund, finalizer, Treasury, and Operator paths are pull-based. Failed external interactions preserve their corresponding liabilities. |
 | Irreversible code finalization | The cut-disabled latch is monotonic; the testnet lifecycle preserved storage across an upgrade, finalized the Diamond, rejected a later cut, and retained ordinary Lottery operation. |
 | Registry deployment binding | The pinned Registry proof package binds its production runtime hash, Quicknet trust anchor, compiler configuration, proof assumptions, and per-rule results. The testnet manifest reconciles the deployed runtime and live compressed and uncompressed proofs. |
@@ -75,6 +76,9 @@ The release gate uses distinct forms of evidence:
 - Robinhood Testnet validators and the committed lifecycle manifest establish concrete behavior on
   chain `46630`. They do not establish production configuration, mainnet readiness, network
   liveness, cryptographic hardness, compiler/client correctness, or malicious-sequencer resistance.
+- [`robinhood-testnet.md`](robinhood-testnet.md) and the
+  [`deployment index`](../deployments/README.md) define the provenance boundary for the reused
+  Statics Genesis contracts and the freshly deployed Registry, Router, and Lottery components.
 
 The audit-ready decision requires terminal green CI on the final pull-request head, no unresolved
 confirmed finding, and review of every production configuration against

@@ -65,7 +65,8 @@ finding is not automatically a production-contract finding.
 |---|---|---|
 | `EqualFiDrandRegistry` | Stack `cdc760a9bf5bbbc1647d13e43b22858677dacad6`; verified source `f8db2a1752d22672d4de1708545e286a32c41497`; testnet `0x61388A94B429A04cAC0357485c12F68f706d7b57` | Immutable Quicknet verification and canonical randomness cache |
 | `bls-solidity` | `11af179a8287d978659aae07adb66aa60f64b8a6` | BLS12-381/EIP-2537 primitives used by the Registry, not the Lottery |
-| `OperatorFeeRouter` | Source `f98a17780cb250ce28f446ab54eb078512fb2e0b`; testnet `0xE7Bb1D2766377984546611291732cED1833C0c36` | Operator ownership, weights, reward-index accounting, and claims |
+| Statics Genesis replica | Manifest `31e870900615197277bcccef6bfdb06dba452930`; Genesis source `43018f109006aa2c2eef2808adc2aa74dfc9a6d4b`; reused testnet collection, activation registry, vault, WETH, and STATICS | External Operator identity/activation/custody inputs and configured Payment Token contracts; the Genesis launch itself was not replayed |
+| `OperatorFeeRouter` | Source `f98a17780cb250ce28f446ab54eb078512fb2e0b`; deployment evidence `5454f935a2037453f5d2f819d64c864f16363df4`; testnet `0xE7Bb1D2766377984546611291732cED1833C0c36` | Operator ownership, weights, reward-index accounting, and claims |
 | OpenZeppelin Contracts | `5fd1781b1454fd1ef8e722282f86f9293cacf256` | ERC-20 interfaces and safe-call behavior |
 | Forge Standard Library | `bf647bd6046f2f7da30d0c2bf435e5c76a780c1b` | Test and script support; not deployed Lottery logic |
 
@@ -249,6 +250,9 @@ role model.
 
 The committed manifests are the authoritative address and transaction evidence:
 
+- [`robinhood-testnet.md`](robinhood-testnet.md) maps reused and fresh components and states which
+  Statics Genesis behaviors the Lottery rehearsal did not exercise;
+- [`deployments/README.md`](../deployments/README.md) indexes the deployment evidence by claim;
 - [`deployments/robinhood-testnet/lottery.json`](../deployments/robinhood-testnet/lottery.json)
   records source/toolchain pins, selectors, runtime hashes, roles, integrations, and initial
   configuration;

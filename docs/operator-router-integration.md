@@ -8,8 +8,10 @@ and Router receipt during `addRewards`.
 No deployment address is hard-coded in the Lottery. Each immutable Lottery integration version
 pins one Router address, and each deployment manifest must identify that address, chain, runtime
 code hash, and reviewed source revision. The reviewed Router repository does not yet contain a
-completed deployment manifest, so this document makes no current mainnet-deployment claim. The
-Lottery testnet release gate will record its disposable Router deployment separately.
+completed mainnet deployment manifest, so this document makes no current mainnet-deployment claim.
+The disposable Robinhood Testnet deployment is pinned in the
+[`EqualFiLabs/operator-fee-router` rehearsal manifest](https://github.com/EqualFiLabs/operator-fee-router/blob/5454f935a2037453f5d2f819d64c864f16363df4/deployments/46630/operator-fee-router-rehearsal.json)
+and cross-referenced by the Lottery deployment evidence.
 
 Before a Round whose configuration has a nonzero Operator allocation can open, the Lottery checks
 that the selected Router has completed bootstrap, has nonzero effective Operator weight, and marks

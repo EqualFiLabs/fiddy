@@ -162,6 +162,8 @@ chain-level trust failure, not a capability the Lottery or drand can independent
 
 The disposable Robinhood Testnet release preserves the single-address architecture and records:
 
+- reused-versus-fresh component provenance and explicit untested Genesis boundaries in
+  [`robinhood-testnet.md`](robinhood-testnet.md);
 - the Diamond, facets, selectors, code hashes, roles, integrations, and initial configurations in
   [`deployments/robinhood-testnet/lottery.json`](../deployments/robinhood-testnet/lottery.json);
 - the Registry deployment and concrete EIP-2537 checks in
