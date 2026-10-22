@@ -1,5 +1,7 @@
 # Statics Lottery Audit Scope
 
+> Historical release evidence: the deployment, audit disposition, and proof hashes below bind the original sellout/refund release. They do not establish assurance for deadline draws. The current candidate requires its own review, CI, and formal evidence; a new live testnet rehearsal has not been executed.
+
 This document defines the release-review boundary for Statics Lottery. Reviewers should audit the
 committed repository candidate they receive, using the specifications and deployment evidence
 listed here. The Robinhood Testnet deployment is a disposable release rehearsal, not a production

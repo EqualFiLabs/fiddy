@@ -2,9 +2,9 @@
 
 ## Overview
 
-Statics Lottery is a sellout-based, configurable ERC-20 lottery implemented as an EIP-2535 Diamond.
+Statics Lottery is a sellout-or-deadline, configurable ERC-20 lottery implemented as an EIP-2535 Diamond.
 
-Players purchase one or more non-transferable ticket positions using the governance-approved Payment Token selected by the Round's immutable configuration version. Multiple concurrent Rounds may use different tokens. Each Round snapshots the complete configuration in effect when the Round begins. When the final ticket sells, the Round permanently commits to the drand Quicknet round scheduled strictly after its L2 timestamp boundary and configured delay. Once that beacon is available, anyone may settle the Round.
+Players purchase one or more non-transferable ticket positions using the governance-approved Payment Token selected by the Round's immutable configuration version. Multiple concurrent Rounds may use different tokens. Each Round snapshots the complete configuration in effect when the Round begins. Opening schedules a beacon strictly after the sales deadline plus delay. An early final purchase deterministically replaces it with the first beacon strictly after sellout plus delay. Sales stop on sellout or deadline, and anyone may settle from that exact beacon. Only sold tickets participate, and only actual receipts are allocated.
 
 Settlement deterministically divides Round revenue among:
 
@@ -68,11 +68,11 @@ alongside reward-asset, bootstrap, and synchronized-weight status views. The Lot
 17. **Settlement performs no token payout to the winner:** Settlement creates accounting liabilities. Winner payment is pull-based.
 18. **Finalizer compensation is also credited rather than pushed:** The finalizer receives a claimable credit in the Round's Payment Token during settlement. A token or receiver failure cannot block settlement.
 19. **Operator routing cannot block settlement:** Settlement only accounts Operator revenue. A later permissionless flush approves the Round's Payment Token and calls `OperatorFeeRouter.addRewards`.
-20. **Unsold Rounds are principal-preserving:** An expired unsold Round creates full participant refund liabilities in its Payment Token and no protocol revenue.
+20. **Unsold Rounds still draw:** At the configured deadline, sales close and the Round draws among purchased tickets, allocating actual receipts. One-ticket Rounds are valid; no minimum-sales or refund branch exists.
 21. **No fallback randomness:** A sold-out Round either settles against its committed Quicknet round or remains pending. `blockhash`, `prevrandao`, administrators, and alternate RNGs are never substitutes.
-22. **Guardian powers are narrow:** A guardian may stop new participation but cannot stop settlement, expiration, claims, refunds, or already-earned revenue handling.
+22. **Guardian powers are narrow:** A guardian may stop new participation but cannot stop settlement, claims, or already-earned revenue handling.
 23. **All accounting is isolated by token:** At rest, escrow and every liability remain in the Round's Payment Token. Failure of a token or Router call reverts the entire flush and preserves the same-token Operator liability in the Diamond.
-24. **Native ETH is deliberately unsupported:** One ERC-20 custody path avoids special-case purchasing, claiming, refund, and Router logic. Governance may enable WETH configurations whenever ETH-denominated participation is desired.
+24. **Native ETH is deliberately unsupported:** One ERC-20 custody path avoids special-case purchasing, claiming, and Router logic. Governance may enable WETH configurations whenever ETH-denominated participation is desired.
 25. **Robinhood sequencing is a chain trust assumption:** Under the deployed code, drand prevents public participants, relayers, finalizers, and ordinary configuration governance from supplying or replacing outcome entropy. V1 does not attempt to neutralize a malicious Robinhood sequencer's inherent transaction-ordering and timestamp influence, and pre-finalization Diamond upgrades remain a separate documented trust boundary.
 
 # Architecture
@@ -124,13 +124,12 @@ stateDiagram-v2
     [*] --> Open: first purchase opens Round
     Open --> Open: additional ticket purchases
     Open --> SoldOut: final ticket purchased
-    Open --> Expired: expiration reached
+    Open --> Settled: deadline reached and scheduled beacon verified
     SoldOut --> Settled: committed Quicknet beacon verified
     Settled --> [*]
-    Expired --> [*]
 ```
 
-Claims occur after the relevant terminal state and do not alter the Round status.
+Unsold status remains `Open` until settlement, but purchases are rejected at `expiresAt`. No separate close transaction is needed. Claims do not alter the terminal status.
 
 ## Randomness Sequence
 
@@ -142,11 +141,16 @@ sequenceDiagram
     participant Drand as drand Quicknet
     participant Finalizer
 
+    Buyer->>Lottery: open with first purchase
+    Lottery->>Registry: firstRoundAfter(deadline + delay)
+    Lottery->>Lottery: store deadline target
+    opt early sellout
     Buyer->>Lottery: buy final tickets
     Lottery->>Registry: firstRoundAfter(sellout + delay)
     Registry-->>Lottery: target Quicknet round
     Lottery->>Registry: hasSig(target)
-    Lottery->>Lottery: permanently store target
+    Lottery->>Lottery: store final sellout target
+    end
     Drand-->>Finalizer: Quicknet signature
     Finalizer->>Lottery: settleRound(roundId, signature)
     alt target not cached
@@ -166,7 +170,7 @@ The `sellout + delay` boundary is an L2 timestamp boundary. Under the accepted
 Robinhood-operated-sequencer honesty assumption, the target is not yet available
 when the final purchase is sequenced. `hasSig(target) == false` proves only that
 the Registry has not cached the target; it does not independently prove that a
-public drand signature is unknown offchain. Likewise, `postedAt > selloutAt`
+public drand signature is unknown offchain. Likewise, `postedAt > salesCloseAt`
 proves Registry ordering on L2, not wall-clock freshness against a sequencer
 deliberately holding L2 time stale. This limitation is an explicit chain trust
 boundary rather than a property of BLS verification.
@@ -308,7 +312,7 @@ function finalizeProtocol() external;
 
 `createLotteryConfig`, `setLotteryConfigEnabled`, `setMaxActiveRounds`, `setIntegrationConfig`, `setTreasuryRecipient`, `setGuardian`, and `finalizeProtocol` require the timelocked Diamond authority.
 
-Created Round Configuration Versions are immutable. Disabling a version prevents only new Round opening; it does not alter purchasing, expiration, settlement, claims, refunds, or revenue handling for a Round already opened from that version.
+Created Round Configuration Versions are immutable. Disabling a version prevents only new Round opening; it does not alter purchasing, settlement, claims, or revenue handling for a Round already opened from that version.
 
 `setPaused(true)` may be called by either the timelocked authority or guardian. `setPaused(false)` may only be called by timelocked authority.
 
@@ -335,7 +339,7 @@ setMaxActiveRounds() remains available
 setPaused()        remains available
 claims             remain available
 settlement         remains available
-refunds            remain available
+deadline draws     remain available
 ```
 
 Governance may separately be renounced later if a fully governance-free deployment is desired, but that is not required for V1.
@@ -362,7 +366,7 @@ Responsibilities:
 - purchase additional tickets;
 - atomically detect Sellout;
 - commit the Round to the Quicknet round scheduled strictly after its L2 timestamp boundary;
-- permissionlessly expire unsold Rounds.
+- schedule the deadline draw on opening; no expiry/refund transition exists.
 
 ### Opening a Round
 
@@ -393,7 +397,7 @@ pull and validate the exact Payment Token amount
 create Round
 snapshot configs/versions
 record first cumulative ticket range
-record buyer refund basis
+schedule and validate firstRoundAfter(expiresAt + randomnessDelay)
 record activeRoundForConfig and increment activeRoundCount
 emit RoundOpened
 emit TicketsPurchased
@@ -429,34 +433,11 @@ per-purchase limit respected
 buyer spent == Lottery received == ticketPrice * ticketQuantity
 ```
 
-For every purchase, the Lottery measures the buyer and Diamond token balances before and after `SafeERC20.safeTransferFrom`. It reverts with `InexactTokenTransfer` unless both deltas equal the required amount. Successful purchases increase the Round's receipts, the token's active escrow, the buyer's refund credit, and the cumulative ticket range by that exact amount only. Token decimals are not normalized; each configuration expresses ticket price and Finalizer Tip directly in that Payment Token's base units.
+For every purchase, the Lottery measures the buyer and Diamond token balances before and after `SafeERC20.safeTransferFrom`. It reverts with `InexactTokenTransfer` unless both deltas equal the required amount. Successful purchases increase the Round's receipts, the token's active escrow, and the cumulative ticket range by that exact amount only. Token decimals are not normalized; each configuration expresses ticket price and Finalizer Tip directly in that Payment Token's base units.
 
-### Expiration
+### Deadline closure
 
-```solidity
-function expireRound(uint256 roundId) external;
-```
-
-Requirements:
-
-```text
-status == Open
-block.timestamp >= expiresAt
-```
-
-Effects:
-
-```text
-status = Expired
-activeRoundForConfig[round.configVersion] = 0
-activeRoundCount -= 1
-assetAccounting[round.config.paymentToken].activeRoundEscrow -= round.receipts
-assetAccounting[round.config.paymentToken].refundLiability += round.receipts
-```
-
-No Treasury or Operator allocation occurs.
-
-Validates Requirements 3 through 7, 15, 17, 18, 19 and 20.
+Purchases require `block.timestamp < expiresAt`. At the deadline, sales close without a transaction. The stored status remains `Open` until `settleRound` consumes the opening schedule. The target cannot be recomputed from the finalizer's timestamp. No refund liability is created.
 
 # 6. `SettlementFacet`
 
@@ -485,8 +466,8 @@ function settleRound(
 ### Settlement Preconditions
 
 ```text
-Round.status == SoldOut
-Round.drandRound != 0
+Round.status == SoldOut OR (Round.status == Open AND block.timestamp >= expiresAt)
+Round.drandRound != 0 AND Round.soldTickets > 0
 ```
 
 Settlement is not blocked by the emergency pause.
@@ -500,7 +481,7 @@ IEqualFiDrandRegistry registry =
     );
 ```
 
-If the target is not cached, call `registry.postSig(round.drandRound, quicknetSignature)`. Afterward require the target to be cached and `registry.postedAt(round.drandRound) > round.selloutAt`.
+If the target is not cached, call `registry.postSig(round.drandRound, quicknetSignature)`. Afterward require the target to be cached and `registry.postedAt(round.drandRound) > salesCloseAt`, where the cutoff is `selloutAt` for sold-out Rounds and `expiresAt` otherwise. A cached beacon is allowed even when posted before the settlement transaction.
 
 ### Application Seed
 
@@ -523,10 +504,10 @@ V1 uses:
 
 ```solidity
 uint32 winningTicket =
-    uint32(uint256(seed) % round.config.ticketCount);
+    uint32(uint256(seed) % round.soldTickets);
 ```
 
-Ticket positions are zero-based. Because `ticketCount` is bounded to `uint32`, modulo bias from a 256-bit seed is negligible. The winning ticket owner is found using binary search over cumulative purchase ranges.
+Ticket positions are zero-based. Because `soldTickets` is bounded to `uint32`, modulo bias from a 256-bit seed is negligible. The winning ticket owner is found using binary search over cumulative purchase ranges.
 
 ### Revenue Calculation
 
@@ -616,32 +597,9 @@ assetAccounting[round.config.paymentToken].winnerLiability -= amount
 
 Then transfer the Round's Payment Token with exact sender-spend and receiver-receipt validation. A revert restores state so a failed or inexact transfer cannot consume the claim.
 
-## Refund Claim
+## Retired refund surface
 
-```solidity
-function claimRefund(
-    uint256 roundId,
-    address receiver
-) external returns (uint256 amount);
-```
-
-Requirements:
-
-```text
-Round.status == Expired
-refundCredit[roundId][msg.sender] > 0
-receiver != address(0)
-```
-
-Effects:
-
-```text
-amount = refundCredit[roundId][msg.sender]
-refundCredit[roundId][msg.sender] = 0
-assetAccounting[round.config.paymentToken].refundLiability -= amount
-```
-
-Then transfer the Round's Payment Token exactly.
+New deadline-draw deployments do not install `expireRound`, `claimRefund`, or `refundableAmount`. Existing `refundCredit`, `refundLiability`, and the `Expired` enum ordinal are reserved for storage compatibility and never written by new Round lifecycles. This release requires a fresh Diamond and does not migrate historical liabilities.
 
 ## Finalizer Tip Claim
 
@@ -810,7 +768,6 @@ function roundConfig(uint256 roundId) external view returns (RoundConfigSnapshot
 function ticketOwner(uint256 roundId, uint32 ticket) external view returns (address);
 function purchaseEntryCount(uint256 roundId) external view returns (uint256);
 function purchaseEntry(uint256 roundId, uint256 index) external view returns (TicketRange memory);
-function refundableAmount(uint256 roundId, address account) external view returns (uint256);
 function lotteryConfig(uint64 version) external view returns (LotteryConfig memory config, bool enabled);
 function currentIntegration() external view returns (IntegrationConfig memory, uint64 version);
 function integrationAt(uint64 version) external view returns (IntegrationConfig memory);
@@ -1025,7 +982,7 @@ enum RoundStatus {
     Open,
     SoldOut,
     Settled,
-    Expired
+    Expired // Reserved legacy ordinal; unreachable for new Rounds.
 }
 ```
 
@@ -1109,6 +1066,7 @@ struct GameStorage {
     mapping(uint64 version => bool enabled) configEnabled;
     mapping(uint256 => Round) rounds;
     mapping(uint256 => TicketRange[]) entries;
+    // Reserved legacy slot; no new purchase credits.
     mapping(uint256 roundId => mapping(address user => uint256 amount)) refundCredit;
     mapping(uint64 configVersion => uint256 roundId) activeRoundForConfig;
 }
@@ -1133,7 +1091,7 @@ bytes32 constant ACCOUNTING_SLOT = keccak256("statics.lottery.storage.accounting
 struct AssetAccounting {
     uint256 activeRoundEscrow;
     uint256 winnerLiability;
-    uint256 refundLiability;
+    uint256 refundLiability; // Reserved legacy slot; zero for new Rounds.
     uint256 finalizerLiability;
     uint256 pendingOperatorRevenueTotal;
     uint256 treasuryAvailable;
@@ -1216,7 +1174,7 @@ global maxActiveRounds = 0
 
 Creating a configuration stores the entire immutable struct atomically. Enabling or disabling the version is a separate governance action. Neither action mutates an existing version or Round snapshot.
 
-# Sellout Commitment
+# Deadline and Sellout Commitment
 
 On the purchase that fills the final ticket:
 
@@ -1244,7 +1202,7 @@ The contract SHOULD additionally verify:
 registry.roundTime(target) > block.timestamp + round.config.randomnessDelay
 ```
 
-as a consistency check against the configured registry. Once written, `round.drandRound` has no ordinary mutation path.
+as a consistency check against the configured registry. The opening deadline schedule may be replaced only by the atomic early-Sellout path above. After the applicable cutoff it has no mutation path. At opening use the same schedule validation with `expiresAt + randomnessDelay`; the caller cannot choose the target.
 
 This construction proves that the target is scheduled strictly after the
 contract's L2 commitment boundary and that ordinary Lottery actors cannot
@@ -1308,7 +1266,7 @@ function pullExact(address asset, address from, uint256 amount) internal;
 function pushExact(address asset, address to, uint256 amount) internal;
 ```
 
-`pullExact` measures both the payer's spend and the Diamond's receipt. `pushExact` measures both the Diamond's spend and the receiver's receipt. Each function uses `SafeERC20` and reverts with `InexactTokenTransfer` unless both deltas equal `amount`. Purchases use `pullExact`; winner, refund, finalizer, and Treasury transfers use `pushExact`. Router ingress uses `forceApprove` followed by `OperatorFeeRouter.addRewards`, whose reviewed implementation independently enforces exact contributor-spend and Router-receipt deltas.
+`pullExact` measures both the payer's spend and the Diamond's receipt. `pushExact` measures both the Diamond's spend and the receiver's receipt. Each function uses `SafeERC20` and reverts with `InexactTokenTransfer` unless both deltas equal `amount`. Purchases use `pullExact`; winner, finalizer, and Treasury transfers use `pushExact`. Router ingress uses `forceApprove` followed by `OperatorFeeRouter.addRewards`, whose reviewed implementation independently enforces exact contributor-spend and Router-receipt deltas.
 
 # Pause Semantics
 
@@ -1323,9 +1281,7 @@ The following remain operational:
 
 ```text
 settleRound
-expireRound
 claimWinner
-claimRefund
 claimFinalizerTips
 flushOperatorRevenue
 flushTreasury
@@ -1382,11 +1338,10 @@ event MaxActiveRoundsUpdated(uint16 previousLimit, uint16 newLimit);
 event IntegrationConfigUpdated(uint64 indexed version, address indexed drandRegistry, address indexed operatorFeeRouter);
 event RoundOpened(uint256 indexed roundId, uint64 indexed configVersion, uint64 indexed integrationVersion, address paymentToken, uint64 openedAt, uint64 expiresAt);
 event TicketsPurchased(uint256 indexed roundId, address indexed buyer, address indexed paymentToken, uint32 startTicket, uint32 quantity, uint32 endExclusive, uint256 amount);
+event RoundDrawScheduled(uint256 indexed roundId, uint64 salesCloseAt, uint64 drandRound);
 event RoundSoldOut(uint256 indexed roundId, uint64 selloutAt, uint64 drandRound);
 event RoundSettled(uint256 indexed roundId, uint32 indexed winningTicket, address indexed winner, address paymentToken, address finalizer, bytes32 applicationSeed, uint256 winnerAmount, uint256 operatorAmount, uint256 treasuryAmount, uint256 finalizerTip);
-event RoundExpired(uint256 indexed roundId, address indexed paymentToken, uint256 refundLiability);
 event WinnerClaimed(uint256 indexed roundId, address indexed winner, address indexed receiver, address paymentToken, uint256 amount);
-event RefundClaimed(uint256 indexed roundId, address indexed user, address indexed receiver, address paymentToken, uint256 amount);
 event FinalizerTipClaimed(address indexed finalizer, address indexed asset, address indexed receiver, uint256 amount);
 event OperatorRevenueFlushed(uint64 indexed integrationVersion, address indexed asset, address indexed caller, uint256 amount);
 event TreasuryFlushed(address indexed asset, address indexed recipient, uint256 amount);
@@ -1419,23 +1374,21 @@ error PurchaseEntryNotFound(uint256 roundId, uint256 index);
 error InexactTokenTransfer(address asset, uint256 expected, uint256 spent, uint256 received);
 error RoundNotFound(uint256 roundId);
 error RoundNotOpen(uint256 roundId);
-error RoundNotSoldOut(uint256 roundId);
+error RoundNotReady(uint256 roundId);
 error RoundNotSettled(uint256 roundId);
-error RoundNotExpired(uint256 roundId);
 error RoundAlreadyTerminal(uint256 roundId);
 error StaleRandomnessRound(uint64 drandRound);
 error RandomnessUnavailable(uint64 drandRound);
-error RandomnessPredatesSellout(uint64 drandRound, uint64 postedAt, uint64 selloutAt);
+error RandomnessPredatesClose(uint64 drandRound, uint64 postedAt, uint64 salesCloseAt);
 error NotWinner(address caller);
 error NoWinnerClaim();
-error NoRefund();
 error NoFinalizerCredit();
 error InsufficientOperatorRevenue(uint64 version, uint256 requested, uint256 available);
 error InsufficientTreasuryBalance(uint256 requested, uint256 available);
 error Reentrancy();
 ```
 
-ERC-20 and `OperatorFeeRouter` failures are allowed to bubble so claims, refunds, Treasury flushes, and Operator flushes remain atomic.
+ERC-20 and `OperatorFeeRouter` failures are allowed to bubble so claims, Treasury flushes, and Operator flushes remain atomic.
 
 # Correctness Properties
 
@@ -1446,14 +1399,14 @@ ERC-20 and `OperatorFeeRouter` failures are allowed to bubble so claims, refunds
 5. **L2-Boundary Randomness Commitment:** At Sellout the target is not already cached and is scheduled strictly after `selloutAt + randomnessDelay`. Under the documented honest-sequencer assumption, it is not yet available when the final purchase is ordered. The property does not establish wall-clock freshness against a malicious sequencer. Validates Requirements 7 and 8.
 6. **Encoding-Invariant Beacon:** Equivalent valid 48-byte and 96-byte Quicknet signatures produce identical `randomnessOf(round)`. Validates Requirements 8 and 9.
 7. **Deterministic Winner:** Fixed registry randomness, chain ID, Diamond address, Round ID, ticket count, and ranges yield one deterministic winner. Validates Requirements 9 and 10.
-8. **Winning Ticket Is Sold:** Every settled Round has `winningTicket < ticketCount` and resolves to exactly one purchaser. Validates Requirements 6, 9 and 10.
+8. **Winning Ticket Is Sold:** Every settled Round has `winningTicket < soldTickets` and resolves to exactly one purchaser. Validates Requirements 6, 9 and 10.
 9. **Settlement Conservation:** `winnerAmount + operatorAmount + treasuryAmount + finalizerTip == round.receipts`. Validates Requirements 10, 11 and 19.
-10. **Expiration Conservation:** For every expired Round, refund liabilities equal Round receipts and protocol allocations equal zero. Validates Requirement 15.
+10. **Deadline Conservation:** Every deadline draw allocates actual receipts and creates no refund liability. Validates Requirement 15.
 11. **Per-Token Solvency:** At all external transaction boundaries and for every Payment Token, Diamond token balance covers that token's active escrow plus winner, refund, finalizer, Operator, and Treasury liabilities. No token may subsidize another. Validates Requirements 14 and 19.
-12. **No Double Claims:** A successful winner, refund, or finalizer claim cannot be repeated. Validates Requirements 12, 15, 19 and 20.
+12. **No Double Claims:** A successful winner or finalizer claim cannot be repeated. Validates Requirements 12, 15, 19 and 20.
 13. **Operator Flush Atomicity:** Failed Payment Token or Operator Router interaction leaves the applicable version-and-token pending Operator revenue unchanged. Validates Requirements 13 and 20.
 14. **Integration Version Preservation:** Changing current integrations cannot rewrite an existing Round's integration version or pending revenue bucket. Validates Requirements 3, 11, 13 and 22.
-15. **Pause Cannot Censor Exit:** Settlement, expiration, winner/refund/finalizer claims, and Operator flushes remain callable while paused when ordinary preconditions are met. Validates Requirements 17 and 18.
+15. **Pause Cannot Censor Exit:** Settlement, winner/finalizer claims, and Operator flushes remain callable while paused when ordinary preconditions are met. Validates Requirements 17 and 18.
 16. **Diamond Finalization Is Irreversible:** Once `cutsDisabled == true`, all future Diamond cuts revert and no transition back exists. Validates Requirement 24.
 17. **Registry Acceptance Soundness:** Subject to the documented EIP-2537 model, every newly stored Registry beacon verified the official Quicknet signature for its exact Round and all rejected or malformed inputs leave storage unchanged. Validates Requirements 8 and 25.
 18. **Registry First-Write Immutability:** Once a Registry beacon is stored, its canonical randomness and `postedAt` never change and no caller has a replacement path. Validates Requirements 8, 9 and 25.
@@ -1469,14 +1422,14 @@ test/LotteryConfig.t.sol
 test/LotteryPurchases.t.sol
 test/LotterySettlement.t.sol
 test/LotteryClaims.t.sol
-test/LotteryExpiration.t.sol
+test/LotteryDeadlineDraws.t.sol
 test/LotteryRevenue.t.sol
 test/LotteryGovernance.t.sol
 test/LotteryDiamond.t.sol
 test/TicketRanges.t.sol
 ```
 
-Coverage includes configuration boundaries, enabled/disabled versions, concurrent multi-token Rounds, exact transfers, incompatible tokens, ticket ranges, multi-purchase ownership, Sellout, expiry boundaries, winner calculation, revenue splits, rounding, zero-value parameters, finalizer tip cap, claims, refunds, failed token transfers, Operator ingress failure, per-token Treasury accounting, pause semantics, Diamond cuts, and irreversible finalization.
+Coverage includes configuration boundaries, enabled/disabled versions, concurrent multi-token Rounds, exact transfers, incompatible tokens, ticket ranges, multi-purchase ownership, Sellout, expiry boundaries, winner calculation, revenue splits, rounding, zero-value parameters, finalizer tip cap, claims, failed token transfers, Operator ingress failure, per-token Treasury accounting, pause semantics, Diamond cuts, and irreversible finalization.
 
 ## Fuzz Tests
 
@@ -1498,7 +1451,7 @@ Proposed:
 test/LotteryInvariant.t.sol
 ```
 
-Handler operations include Round opening, purchases, time advance, expiry, settlement, claims, refunds, configuration changes, integration changes, Operator flushes, Treasury flushes, and pause/unpause.
+Handler operations include Round opening, purchases, time advance, deadline draws, settlement, claims, configuration changes, integration changes, Operator flushes, Treasury flushes, and pause/unpause.
 
 Persistent invariants include per-token solvency and isolation, ticket count bounds, terminal-state irreversibility, no double claims, configuration snapshot immutability, activeRoundCount consistency, accounting conservation, and Operator liabilities never becoming Treasury funds.
 
@@ -1532,7 +1485,7 @@ resolve winner
 claim winner funds
 ```
 
-A second test SHALL exercise an unsold expired Round with full refunds. A third SHALL prove unavailable Operator ingress cannot block settlement, and a later successful flush SHALL transfer the exact configured Payment Token into `OperatorFeeRouter`. The release gate SHALL also operate concurrent active Rounds in at least two different Payment Tokens and prove accounting isolation across their complete lifecycles.
+A second test SHALL exercise an unsold deadline draw using the preselected beacon and actual-receipt allocations. A third SHALL prove unavailable Operator ingress cannot block settlement, and a later successful flush SHALL transfer the exact configured Payment Token into `OperatorFeeRouter`. The release gate SHALL also operate concurrent active Rounds in at least two different Payment Tokens and prove accounting isolation across their complete lifecycles.
 
 ## Formal / Property Verification Targets
 
@@ -1585,7 +1538,7 @@ resistance to a rogue Robinhood sequencer.
 | Formal verification | 7, 8, 9, 24, 25 |
 | Settlement | 9, 10, 11, 16, 18, 19 |
 | Winner/finalizer claims | 10, 12, 18, 19, 20 |
-| Expiry/refunds | 15, 17, 18, 19, 20 |
+| Deadline draws | 15, 17, 18, 19, 20 |
 | Operator Fee Router | 13, 19, 20, 22 |
 | Treasury accounting | 14, 19, 20 |
 | Pause/guardian | 17, 18 |

@@ -1,5 +1,7 @@
 # Statics Lottery Release Checkpoint
 
+> Historical release evidence: the deployment, audit disposition, and proof hashes below bind the original sellout/refund release. They do not establish assurance for deadline draws. The current candidate requires its own review, CI, and formal evidence; a new live testnet rehearsal has not been executed.
+
 This checkpoint consolidates the release evidence for Statics Lottery. It is an audit-readiness
 decision, not a production deployment approval. The Robinhood Testnet deployment remains a
 disposable lifecycle rehearsal, and production governance, roles, integrations, and Payment Tokens

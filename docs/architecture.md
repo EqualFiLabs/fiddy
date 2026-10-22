@@ -46,9 +46,9 @@ storage and delegates to the selected facet. The initial production surface cont
 | `DiamondCutFacet` | Authority-gated EIP-2535 add, replace, remove, and initializer execution |
 | `DiamondLoupeFacet` | Facet and selector introspection |
 | `GovernanceFacet` | Configuration versions, integration versions, roles, pause, concurrency, and finalization |
-| `LotteryFacet` | Opening, exact ticket purchases, sellout commitment, and unsold expiration |
+| `LotteryFacet` | Opening, exact ticket purchases, deadline scheduling and early sellout commitment |
 | `SettlementFacet` | Registry consumption, winner derivation, and accounting-only settlement |
-| `ClaimsFacet` | Pull-based winner, refund, and finalizer claims |
+| `ClaimsFacet` | Pull-based winner and finalizer claims |
 | `RevenueFacet` | Retryable Operator/Treasury delivery and canonical-token surplus handling |
 | `LotteryViewFacet` | Round, configuration, ticket-range, and accounting reads |
 
@@ -74,51 +74,28 @@ retyping fields inside a live namespace is not safe merely because the facet com
 ## Round lifecycle
 
 ```text
-None
-  |
-  | openRound(configVersion, firstPurchase)
-  v
-Open ---------------------------> Expired
-  |                                 |
-  | final ticket                    | claimRefund()
-  | commits one future beacon       v
-  v                               refund paid
-SoldOut
-  |
-  | settleRound(exact beacon proof)
-  v
-Settled
-  |
-  +--> claimWinner()
-  +--> claimFinalizerTips()
-  +--> flushTreasury()
-  +--> flushOperatorRevenue()
+None -- first paid purchase --> Open -- early sellout --> SoldOut
+                                 |                         |
+                                 | deadline + beacon       | sellout beacon
+                                 +-----------> Settled <---+
 ```
 
-`openRound` is the first purchase, not a free empty-Round operation. It requires an enabled
-configuration, global capacity, no other nonterminal Round for that configuration, and a current
-Integration Version. When the Operator share is nonzero, the configured Router must also be
-bootstrapped, have positive synchronized weight, and accept the Payment Token.
+Opening requires an enabled immutable configuration, global capacity, no other nonterminal Round for that version, and current integrations. Nonzero Operator allocations additionally require a ready Router accepting the token.
 
-Every successful purchase:
+Opening stores the first Registry beacon strictly after `expiresAt + randomnessDelay` and emits `RoundDrawScheduled`. Duration is configurable, including week-long Rounds; 24 hours is not a protocol maximum. Purchases record cumulative ownership ranges, actual receipts, and exact same-token escrow. No purchase refund credit is recorded.
 
-1. records an increasing cumulative ticket range for the buyer;
-2. increases Round receipts and the buyer's potential refund credit;
-3. increases active escrow for the Round's Payment Token; and
-4. pulls exactly `ticketPrice * quantity` by verifying both buyer spend and Diamond receipt.
+The final ticket purchase before the deadline atomically records `selloutAt`, marks `SoldOut`, and deterministically supersedes the deadline schedule with the first beacon strictly after `selloutAt + randomnessDelay`. Invalid/cached targets revert the entire purchase. This is the only permitted rescheduling.
 
-If the last ticket sells, the same transaction changes the Round to `SoldOut`, records
-`selloutAt`, and permanently stores one Quicknet target strictly after the supplied L2 boundary.
-A sold-out Round cannot expire, cancel, accept more tickets, or change its beacon.
+At or after `expiresAt`, an unsold Round rejects every purchase and becomes eligible for direct `settleRound` once the recorded beacon is available. Its stored status remains `Open` until settlement; callers must consider the deadline when displaying sales availability. No separate close transaction exists.
 
-An unsold Round may be expired after its sales deadline. Expiration moves all of that Round's
-receipts from active escrow to participant refund liability. It creates no winner, Operator,
-Treasury, or finalizer revenue.
+Both paths select among `soldTickets` and allocate actual receipts. One-ticket Rounds draw normally. No new Round can expire into refunds. Historical refund slots and the `Expired` enum ordinal remain reserved without reordering storage. New deployments omit `expireRound`, `claimRefund`, and `refundableAmount` selectors.
+
+Settlement releases global capacity and the configuration's active-Round slot. A sold-out but unsettled Round continues occupying its slot.
 
 ## Settlement and exits
 
 Settlement verifies or reuses only the Round's committed Registry beacon, derives one
-domain-separated seed, resolves the winning ticket through cumulative ranges, and records the
+domain-separated seed, resolves the winning sold ticket through cumulative ranges, and records the
 result. It performs no Payment Token, winner, Treasury, or Router value transfer.
 
 That separation is intentional. Token delivery and external Router availability cannot reverse or
@@ -126,8 +103,8 @@ block the Round's terminal state. Claims and revenue delivery are independent pu
 Each guarded value-moving path clears its liability before interaction and relies on atomic EVM
 rollback if an external call or exact-delta check fails.
 
-Pausing affects only `openRound` and `buyTickets`. It cannot prevent settlement, expiration,
-winner claims, refunds, finalizer claims, Treasury delivery, Operator retries, surplus handling, or
+Pausing affects only `openRound` and `buyTickets`. It cannot prevent settlement,
+winner claims, finalizer claims, Treasury delivery, Operator retries, surplus handling, or
 views.
 
 ## Progressive immutability
@@ -158,7 +135,9 @@ stale until a favorable public beacon exists, violates that accepted chain assum
 chain-level trust failure, not a capability the Lottery or drand can independently repair. See
 [randomness.md](randomness.md) for the exact claim boundary.
 
-## Testnet realization
+## Historical testnet realization
+
+The recorded deployment predates deadline draws and was finalized. It is not evidence for the new behavior, which requires a fresh Diamond and a separately authorized real-beacon rehearsal. Current scripts require `LOTTERY_DIAMOND` explicitly rather than targeting the historical address.
 
 The disposable Robinhood Testnet release preserves the single-address architecture and records:
 
