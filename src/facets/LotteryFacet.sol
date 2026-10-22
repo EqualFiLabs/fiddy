@@ -13,7 +13,6 @@ import { LibReentrancy } from "../libraries/LibReentrancy.sol";
 import { LibTicketRanges } from "../libraries/LibTicketRanges.sol";
 import { Errors } from "../shared/Errors.sol";
 import {
-    AssetAccounting,
     IntegrationConfig,
     LotteryConfig,
     Round,
@@ -84,6 +83,13 @@ contract LotteryFacet is ILottery {
             round.expiresAt
         );
 
+        _scheduleDraw(
+            round,
+            roundId,
+            IEqualFiDrandRegistry(integrations.integrations[integrationVersion].drandRegistry),
+            round.expiresAt,
+            round.config.randomnessDelay
+        );
         _recordPurchase(gs, round, roundId, ticketQuantity);
     }
 
@@ -100,25 +106,6 @@ contract LotteryFacet is ILottery {
         _recordPurchase(gs, round, roundId, ticketQuantity);
     }
 
-    function expireRound(uint256 roundId) external {
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        Round storage round = gs.rounds[roundId];
-        if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
-        if (round.status != RoundStatus.Open) revert Errors.RoundNotOpen(roundId);
-        if (block.timestamp < round.expiresAt) revert Errors.RoundNotExpired(roundId);
-
-        round.status = RoundStatus.Expired;
-        gs.activeRoundForConfig[round.configVersion] = 0;
-        --gs.activeRoundCount;
-
-        AssetAccounting storage accounting =
-            LibLotteryStorage.accountingStorage().assetAccounting[round.config.paymentToken];
-        accounting.activeRoundEscrow -= round.receipts;
-        accounting.refundLiability += round.receipts;
-
-        emit RoundExpired(roundId, round.config.paymentToken, round.receipts);
-    }
-
     function _recordPurchase(
         LibLotteryStorage.GameStorage storage gs,
         Round storage round,
@@ -132,7 +119,6 @@ contract LotteryFacet is ILottery {
 
         round.soldTickets = endExclusive;
         round.receipts += amount;
-        gs.refundCredit[roundId][msg.sender] += amount;
         TicketRange[] storage entries = gs.entries[roundId];
         LibTicketRanges.append(entries, msg.sender, endExclusive);
         LibLotteryStorage.accountingStorage()
@@ -167,15 +153,27 @@ contract LotteryFacet is ILottery {
         round.status = RoundStatus.SoldOut;
         round.selloutAt = block.timestamp.toUint64();
 
-        commitmentBoundary = block.timestamp + randomnessDelay;
+        (commitmentBoundary, target) =
+            _scheduleDraw(round, roundId, registry, round.selloutAt, randomnessDelay);
+        emit RoundSoldOut(roundId, round.selloutAt, target);
+    }
+
+    /// @dev The opening deadline target can only be superseded by an atomic early sellout.
+    function _scheduleDraw(
+        Round storage round,
+        uint256 roundId,
+        IEqualFiDrandRegistry registry,
+        uint64 salesCloseAt,
+        uint32 randomnessDelay
+    ) internal returns (uint256 commitmentBoundary, uint64 target) {
+        commitmentBoundary = uint256(salesCloseAt) + randomnessDelay;
         target = registry.firstRoundAfter(commitmentBoundary);
         if (target == 0 || registry.roundTime(target) <= commitmentBoundary) {
             revert Errors.InvalidRandomnessRound(target);
         }
         if (registry.hasSig(target)) revert Errors.StaleRandomnessRound(target);
-
         round.drandRound = target;
-        emit RoundSoldOut(roundId, round.selloutAt, target);
+        emit RoundDrawScheduled(roundId, salesCloseAt, target);
     }
 
     function _validateQuantity(uint32 quantity, uint32 available, uint32 purchaseLimit)

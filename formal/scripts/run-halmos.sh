@@ -6,7 +6,7 @@ mkdir -p "$result_dir"
 
 set +e
 halmos \
-  --match-contract '^(LotteryCommitmentHalmosTest|LotterySettlementHalmosTest|LotteryClaimsHalmosTest|LotteryRevenueHalmosTest|LotteryCutsHalmosTest)$' \
+  --match-contract '^(LotteryCommitmentHalmosTest|LotteryDeadlineHalmosTest|LotterySettlementHalmosTest|LotteryClaimsHalmosTest|LotteryRevenueHalmosTest|LotteryCutsHalmosTest)$' \
   --solver z3 \
   --storage-layout generic \
   --solver-timeout-branching 0 \

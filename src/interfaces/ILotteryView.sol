@@ -21,7 +21,6 @@ interface ILotteryView {
         external
         view
         returns (TicketRange memory);
-    function refundableAmount(uint256 roundId, address account) external view returns (uint256);
     function lotteryConfig(uint64 version)
         external
         view

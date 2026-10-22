@@ -345,7 +345,7 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
         assertEq(stateView.assetAccounting(address(aliasToken)).treasuryAvailable, 0);
     }
 
-    function test_DownwardBalanceDriftCannotBecomeSurplusAndPreservesRefund() public {
+    function test_DownwardBalanceDriftCannotBecomeSurplusAndPreservesWinner() public {
         BalanceDriftToken token = new BalanceDriftToken();
         router.setAsset(address(token), true, true);
         LotteryConfig memory config = _config(address(token), 10, 10, 10, 1 days, 0);
@@ -363,20 +363,22 @@ contract LotteryRevenueTest is LotteryIntegrationSetup {
 
         Round memory open = stateView.round(roundId);
         vm.warp(open.expiresAt);
-        lottery.expireRound(roundId);
+        _prepareProof(roundId, hex"abcd");
+        settlement.settleRound(roundId, hex"abcd");
+        token.driftDown(address(diamond), 10);
 
         assertEq(revenue.availableTokenSurplus(address(token)), 0);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IERC20Errors.ERC20InsufficientBalance.selector, address(diamond), 49, 50
+                IERC20Errors.ERC20InsufficientBalance.selector, address(diamond), 39, 40
             )
         );
         vm.prank(alice);
-        claims.claimRefund(roundId, alice);
+        claims.claimWinner(roundId, alice);
 
-        assertEq(stateView.refundableAmount(roundId, alice), 50);
-        assertEq(stateView.assetAccounting(address(token)).refundLiability, 50);
-        assertEq(token.balanceOf(address(diamond)), 49);
+        assertEq(stateView.round(roundId).winnerClaimable, 40);
+        assertEq(stateView.assetAccounting(address(token)).winnerLiability, 40);
+        assertEq(token.balanceOf(address(diamond)), 39);
     }
 
     function test_InexactRouterTransferRollsBackLiabilityAndRouterState() public {

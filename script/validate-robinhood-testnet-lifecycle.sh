@@ -6,7 +6,7 @@ set -euo pipefail
 cast_bin=${CAST_BIN:-cast}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/.." && pwd)
-manifest="$repo_root/deployments/robinhood-testnet/lifecycle.json"
+manifest="${1:-$repo_root/deployments/robinhood-testnet/lifecycle.json}"
 
 assert_equal() {
     local actual=$1
@@ -100,6 +100,39 @@ while IFS= read -r encoded_round; do
             "$(jq -r ".$field" <<<"$expected")" \
             "Round $round_id $field"
     done
+    if [[ $(jq -r '.lifecycleModel // "legacy"' "$manifest") == deadline-draws ]]; then
+        sold=$(jq -r '.[0][16]' <<<"$live")
+        cap=$(jq -r '.[0][2]' <<<"$live")
+        winning=$(jq -r '.[0][17]' <<<"$live")
+        price=$(jq -r '.[0][1]' <<<"$live")
+        receipts=$(jq -r '.[0][20]' <<<"$live")
+        # Use arbitrary-precision arithmetic for uint96 price * uint32 sold.
+        python3 - "$price" "$sold" "$receipts" "$winning" <<'CHECK'
+import sys
+price, sold, receipts, winning = map(int, sys.argv[1:])
+assert sold > 0 and receipts == price * sold and 0 <= winning < sold
+CHECK
+        close_at=$(jq -r '.[0][13]' <<<"$live")
+        if (( close_at == 0 )); then close_at=$(jq -r '.[0][12]' <<<"$live"); fi
+        delay=$(jq -r '.[0][4]' <<<"$live")
+        target=$(scalar_call "$registry" 'firstRoundAfter(uint256)(uint64)' "$((close_at + delay))")
+        assert_equal "$(jq -r '.[0][15]' <<<"$live")" "$target" "Round $round_id deterministic beacon"
+        assert_equal "$(jq -r '.[0][18]' <<<"$live")" "3" "Round $round_id settled"
+        if jq -e --argjson id "$round_id" '.deadlineDrawRoundIds | index($id) != null' "$manifest" >/dev/null; then
+            assert_equal "$(jq -r '.[0][13]' <<<"$live")" "0" "deadline Round $round_id sellout timestamp"
+            if (( sold >= cap )); then echo "deadline Round must be partially sold" >&2; exit 1; fi
+        fi
+        opening_hash=$(jq -er '.openingTransactionHash' <<<"$expected")
+        opening_receipt=$($cast_bin receipt "$opening_hash" --rpc-url "$ROBINHOOD_TESTNET" --json | cast_json_payload)
+        schedule_topic=$($cast_bin keccak 'RoundDrawScheduled(uint256,uint64,uint64)')
+        round_topic=$($cast_bin to-uint256 "$round_id")
+        opening_schedule=$(jq -er --arg address "${diamond,,}" --arg topic "$schedule_topic" --arg round "$round_topic"             '[.logs[] | select((.address | ascii_downcase) == $address and .topics[0] == $topic and .topics[1] == $round)][0].data' <<<"$opening_receipt")
+        decoded_schedule=$($cast_bin decode-abi 'schedule()(uint64,uint64)' "$opening_schedule" --json | cast_json_payload)
+        deadline=$(jq -r '.[0][12]' <<<"$live")
+        assert_equal "$(jq -r '.[0]' <<<"$decoded_schedule")" "$deadline" "Round $round_id opening deadline"
+        opening_target=$(scalar_call "$registry" 'firstRoundAfter(uint256)(uint64)' "$((deadline + delay))")
+        assert_equal "$(jq -r '.[1]' <<<"$decoded_schedule")" "$opening_target" "Round $round_id opening schedule"
+    fi
     if jq -e 'has("refund")' <<<"$expected" >/dev/null; then
         assert_equal \
             "$(scalar_call "$diamond" 'refundableAmount(uint256,address)(uint256)' "$round_id" "$deployer")" \
@@ -107,6 +140,13 @@ while IFS= read -r encoded_round; do
             "Round $round_id refund credit"
     fi
 done < <(jq -r '.rounds[] | @base64' "$manifest")
+
+if [[ $(jq -r '.lifecycleModel // "legacy"' "$manifest") == deadline-draws ]]; then
+    jq -e '.deadlineDrawRoundIds | length > 0' "$manifest" >/dev/null
+    while IFS= read -r id; do
+        jq -e --argjson id "$id" 'any(.rounds[]; .roundId == $id) and any(.quicknet[]; .roundId == $id)' "$manifest" >/dev/null
+    done < <(jq -r '.deadlineDrawRoundIds[]' "$manifest")
+fi
 
 for asset_name in weth statics; do
     if [[ $asset_name == weth ]]; then
@@ -219,12 +259,14 @@ while IFS= read -r encoded_beacon; do
         "$(scalar_call "$registry" 'postedAt(uint64)(uint64)' "$round")" \
         "$(jq -r '.postedAt' <<<"$beacon_record")" \
         "Registry posting time"
-    sellout=$(jq -r --argjson round_id "$round_id" '.rounds[] | select(.roundId == $round_id) | .selloutAt' "$manifest")
+    sellout=$(jq -r --argjson round_id "$round_id" '.rounds[] | select(.roundId == $round_id) | if .selloutAt == 0 then .expiresAt else .selloutAt end' "$manifest")
     delay=$(
         $cast_bin call "$diamond" "$round_signature" "$round_id" \
             --block "$state_block" --rpc-url "$ROBINHOOD_TESTNET" --json | jq -r '.[0][4]'
     )
     target_time=$(jq -r '.targetRoundTime' <<<"$beacon_record")
+    posted_at=$(jq -r '.postedAt' <<<"$beacon_record")
+    if (( posted_at <= sellout )); then echo "beacon predates sales cutoff" >&2; exit 1; fi
     if (( target_time <= sellout + delay )); then
         echo "Quicknet target for Round $round_id is not strictly future" >&2
         exit 1

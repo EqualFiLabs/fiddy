@@ -7,13 +7,13 @@ import { IntegrationEndpoint, LotteryIntegrationSetup } from "./utils/LotteryInt
 
 contract LotteryEndToEndTest is LotteryIntegrationSetup {
     address internal winnerReceiver = makeAddr("winnerReceiver");
-    address internal refundReceiver = makeAddr("refundReceiver");
+    address internal deadlineWinnerReceiver = makeAddr("deadlineWinnerReceiver");
     address internal finalizerReceiver = makeAddr("finalizerReceiver");
 
-    function test_CompletesConcurrentSettlementAndRefundWithIsolatedAccounting() public {
+    function test_CompletesConcurrentSelloutAndDeadlineDrawsWithIsolatedAccounting() public {
         uint256 settledRoundId = _sellOutRoundA();
         vm.prank(alice);
-        uint256 expiredRoundId = lottery.openRound(2, 2);
+        uint256 deadlineRoundId = lottery.openRound(2, 2);
 
         assertEq(stateView.activeRoundCount(), 2);
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 100);
@@ -27,7 +27,7 @@ contract LotteryEndToEndTest is LotteryIntegrationSetup {
 
         Round memory settled = stateView.round(settledRoundId);
         assertEq(uint8(settled.status), uint8(RoundStatus.Settled));
-        assertEq(uint8(stateView.round(expiredRoundId).status), uint8(RoundStatus.Open));
+        assertEq(uint8(stateView.round(deadlineRoundId).status), uint8(RoundStatus.Open));
         assertEq(stateView.activeRoundCount(), 1);
         _assertSettledAccounting();
 
@@ -55,18 +55,22 @@ contract LotteryEndToEndTest is LotteryIntegrationSetup {
         assertEq(router.totalAdded(address(tokenA)), 10);
         assertEq(tokenA.balanceOf(address(diamond)), 0);
 
-        vm.warp(stateView.round(expiredRoundId).expiresAt);
+        vm.warp(stateView.round(deadlineRoundId).expiresAt);
         vm.prank(bob);
-        lottery.expireRound(expiredRoundId);
-        assertEq(stateView.refundableAmount(expiredRoundId, alice), 40);
-        assertEq(stateView.assetAccounting(address(tokenB)).refundLiability, 40);
+        _prepareProof(deadlineRoundId, hex"abcd");
+        vm.prank(finalizer);
+        settlement.settleRound(deadlineRoundId, hex"abcd");
+        assertEq(stateView.assetAccounting(address(tokenB)).refundLiability, 0);
         assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 0);
-
         vm.prank(alice);
-        assertEq(claims.claimRefund(expiredRoundId, refundReceiver), 40);
-        assertEq(tokenB.balanceOf(refundReceiver), 40);
+        assertEq(claims.claimWinner(deadlineRoundId, deadlineWinnerReceiver), 32);
+        assertEq(tokenB.balanceOf(deadlineWinnerReceiver), 32);
+        vm.prank(finalizer);
+        claims.claimFinalizerTips(address(tokenB), finalizerReceiver);
+        revenue.flushTreasury(address(tokenB), 1);
+        revenue.flushOperatorRevenue(1, address(tokenB), 4);
         assertEq(tokenB.balanceOf(address(diamond)), 0);
-        assertEq(router.totalAdded(address(tokenB)), 0);
+        assertEq(router.totalAdded(address(tokenB)), 4);
         assertEq(stateView.activeRoundCount(), 0);
 
         _assertAccountingCleared(address(tokenA));
@@ -74,7 +78,6 @@ contract LotteryEndToEndTest is LotteryIntegrationSetup {
         assertEq(stateView.pendingOperatorRevenue(1, address(tokenA)), 0);
         assertEq(stateView.pendingOperatorRevenue(1, address(tokenB)), 0);
         assertEq(stateView.finalizerCredit(address(tokenA), finalizer), 0);
-        assertEq(stateView.refundableAmount(expiredRoundId, alice), 0);
         assertEq(stateView.round(settledRoundId).winnerClaimable, 0);
     }
 

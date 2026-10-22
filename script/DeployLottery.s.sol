@@ -229,10 +229,9 @@ contract DeployLottery is Script {
     }
 
     function _lotterySelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](3);
+        selectors = new bytes4[](2);
         selectors[0] = ILottery.openRound.selector;
         selectors[1] = ILottery.buyTickets.selector;
-        selectors[2] = ILottery.expireRound.selector;
     }
 
     function _settlementSelectors() internal pure returns (bytes4[] memory selectors) {
@@ -241,10 +240,9 @@ contract DeployLottery is Script {
     }
 
     function _claimsSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](3);
+        selectors = new bytes4[](2);
         selectors[0] = IClaims.claimWinner.selector;
-        selectors[1] = IClaims.claimRefund.selector;
-        selectors[2] = IClaims.claimFinalizerTips.selector;
+        selectors[1] = IClaims.claimFinalizerTips.selector;
     }
 
     function _revenueSelectors() internal pure returns (bytes4[] memory selectors) {
@@ -257,7 +255,7 @@ contract DeployLottery is Script {
     }
 
     function _viewSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](17);
+        selectors = new bytes4[](16);
         selectors[0] = ILotteryView.latestLotteryConfigVersion.selector;
         selectors[1] = ILotteryView.latestRoundId.selector;
         selectors[2] = ILotteryView.round.selector;
@@ -265,15 +263,14 @@ contract DeployLottery is Script {
         selectors[4] = ILotteryView.ticketOwner.selector;
         selectors[5] = ILotteryView.purchaseEntryCount.selector;
         selectors[6] = ILotteryView.purchaseEntry.selector;
-        selectors[7] = ILotteryView.refundableAmount.selector;
-        selectors[8] = ILotteryView.lotteryConfig.selector;
-        selectors[9] = ILotteryView.currentIntegration.selector;
-        selectors[10] = ILotteryView.integrationAt.selector;
-        selectors[11] = ILotteryView.activeRoundCount.selector;
-        selectors[12] = ILotteryView.maxActiveRounds.selector;
-        selectors[13] = ILotteryView.pendingOperatorRevenue.selector;
-        selectors[14] = ILotteryView.assetAccounting.selector;
-        selectors[15] = ILotteryView.finalizerCredit.selector;
-        selectors[16] = ILotteryView.activeRoundForConfig.selector;
+        selectors[7] = ILotteryView.lotteryConfig.selector;
+        selectors[8] = ILotteryView.currentIntegration.selector;
+        selectors[9] = ILotteryView.integrationAt.selector;
+        selectors[10] = ILotteryView.activeRoundCount.selector;
+        selectors[11] = ILotteryView.maxActiveRounds.selector;
+        selectors[12] = ILotteryView.pendingOperatorRevenue.selector;
+        selectors[13] = ILotteryView.assetAccounting.selector;
+        selectors[14] = ILotteryView.finalizerCredit.selector;
+        selectors[15] = ILotteryView.activeRoundForConfig.selector;
     }
 }

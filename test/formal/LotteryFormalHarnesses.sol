@@ -15,7 +15,7 @@ import { IOperatorFeeRouter } from "../../src/interfaces/IOperatorFeeRouter.sol"
 import { IRevenue } from "../../src/interfaces/IRevenue.sol";
 import { LibLotteryStorage } from "../../src/libraries/LibLotteryStorage.sol";
 import { LibReentrancy } from "../../src/libraries/LibReentrancy.sol";
-import { AssetAccounting, Round, RoundStatus } from "../../src/shared/Types.sol";
+import { AssetAccounting, Round, RoundStatus, TicketRange } from "../../src/shared/Types.sol";
 
 contract FormalToken is ERC20 {
     constructor(string memory symbol) ERC20(symbol, symbol) { }
@@ -179,6 +179,75 @@ contract LotteryCommitmentHarness is LotteryFacet {
     }
 }
 
+contract LotteryDeadlineCommitmentHarness is LotteryFacet {
+    constructor() {
+        LibReentrancy.initialize();
+    }
+
+    function executeDeadlineCommitment(FormalRegistry registry, uint32 duration, uint32 delay)
+        external
+        returns (CommitmentObservation memory result)
+    {
+        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+        round.status = RoundStatus.Open;
+        round.expiresAt = uint64(block.timestamp + duration);
+        (result.commitmentBoundary, result.drandRound) =
+            _scheduleDraw(round, 1, registry, round.expiresAt, delay);
+        result.registryRoundTime = registry.roundTime(result.drandRound);
+        result.status = round.status;
+        LibLotteryStorage.gameStorage().configs[1].randomnessDelay = 77;
+        result.targetAfterCalls = round.drandRound;
+    }
+
+    function seedPurchaseBoundary(uint64 deadline) external {
+        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+        round.status = RoundStatus.Open;
+        round.expiresAt = deadline;
+        round.config.ticketCount = 10;
+        round.soldTickets = 1;
+        round.receipts = 10;
+    }
+
+    function purchaseState() external view returns (uint32 sold, uint256 receipts) {
+        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+        return (round.soldTickets, round.receipts);
+    }
+}
+
+contract LotteryDeadlineSettlementHarness is SettlementFacet {
+    constructor() {
+        LibReentrancy.initialize();
+    }
+
+    function seedDeadlineRound(FormalRegistry registry, uint32 sold) external {
+        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
+        Round storage round = gs.rounds[1];
+        round.status = RoundStatus.Open;
+        round.config.ticketCount = sold + 1;
+        round.config.winnerBps = 8000;
+        round.config.operatorProtocolBps = 5000;
+        round.soldTickets = sold;
+        round.receipts = sold;
+        round.expiresAt = 1;
+        round.drandRound = 2;
+        round.integrationVersion = 1;
+        gs.activeRoundCount = 1;
+        gs.activeRoundForConfig[0] = 1;
+        gs.entries[1].push(TicketRange(msg.sender, sold));
+        LibLotteryStorage.integrationStorage().integrations[1].drandRegistry = address(registry);
+        LibLotteryStorage.accountingStorage().assetAccounting[address(0)].activeRoundEscrow = sold;
+    }
+
+    function observe()
+        external
+        view
+        returns (Round memory round, AssetAccounting memory accounting)
+    {
+        round = LibLotteryStorage.gameStorage().rounds[1];
+        accounting = LibLotteryStorage.accountingStorage().assetAccounting[address(0)];
+    }
+}
+
 contract LotterySettlementHarness is SettlementFacet {
     constructor() {
         LibReentrancy.initialize();
@@ -276,38 +345,6 @@ contract LotteryClaimsHarness is FormalFacetHost {
         );
         result.remainingClaim = round.winnerClaimable;
         result.aggregateLiability = accounting.winnerLiability;
-        result.receiverBalance = token.balanceOf(receiver);
-        result.custodyBalance = token.balanceOf(address(this));
-    }
-
-    function executeRefundClaim(
-        ClaimsFacet facet,
-        FormalToken token,
-        uint96 amount,
-        address receiver
-    ) external returns (ClaimObservation memory result) {
-        token.mint(address(this), amount);
-
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        Round storage round = gs.rounds[2];
-        round.config.paymentToken = address(token);
-        round.status = RoundStatus.Expired;
-        gs.refundCredit[2][msg.sender] = amount;
-        AssetAccounting storage accounting =
-            LibLotteryStorage.accountingStorage().assetAccounting[address(token)];
-        accounting.refundLiability = amount;
-
-        result.firstAmount = abi.decode(
-            _delegate(
-                address(facet), abi.encodeWithSelector(IClaims.claimRefund.selector, 2, receiver)
-            ),
-            (uint256)
-        );
-        result.repeatedSucceeded = _tryDelegate(
-            address(facet), abi.encodeWithSelector(IClaims.claimRefund.selector, 2, receiver)
-        );
-        result.remainingClaim = gs.refundCredit[2][msg.sender];
-        result.aggregateLiability = accounting.refundLiability;
         result.receiverBalance = token.balanceOf(receiver);
         result.custodyBalance = token.balanceOf(address(this));
     }

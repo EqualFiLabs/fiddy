@@ -168,7 +168,7 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Errors.RandomnessPredatesSellout.selector,
+                Errors.RandomnessPredatesClose.selector,
                 soldOut.drandRound,
                 soldOut.selloutAt,
                 soldOut.selloutAt
@@ -179,26 +179,26 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         assertEq(uint8(stateView.round(roundId).status), uint8(RoundStatus.SoldOut));
     }
 
-    function test_RejectsOpenExpiredAndAlreadySettledRounds() public {
+    function test_RejectsPrematureAndAlreadySettledRounds() public {
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotFound.selector, 999));
         settlement.settleRound(999, "");
 
         vm.prank(alice);
         uint256 openRoundId = lottery.openRound(1, 1);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, openRoundId));
+        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotReady.selector, openRoundId));
         settlement.settleRound(openRoundId, "");
 
         Round memory open = stateView.round(openRoundId);
         vm.warp(open.expiresAt);
-        lottery.expireRound(openRoundId);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, openRoundId));
-        settlement.settleRound(openRoundId, "");
+        bytes memory deadlineProof = hex"abcd";
+        _prepareProof(openRoundId, deadlineProof);
+        settlement.settleRound(openRoundId, deadlineProof);
 
         uint256 soldOutRoundId = _sellOutRoundA();
         bytes memory proof = hex"1234";
         _prepareProof(soldOutRoundId, proof);
         settlement.settleRound(soldOutRoundId, proof);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotSoldOut.selector, soldOutRoundId));
+        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotReady.selector, soldOutRoundId));
         settlement.settleRound(soldOutRoundId, proof);
     }
 

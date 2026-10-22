@@ -211,25 +211,18 @@ contract LotteryStateHandler is Test {
         vm.warp(block.timestamp + bound(rawSeconds, 0, 3 days));
     }
 
-    function expireRound(uint256 rawRound) external {
-        uint256 roundId = _selectRound(rawRound);
-        if (roundId == 0) return;
-        Round memory current = lotteryView.round(roundId);
-        if (current.status != RoundStatus.Open || block.timestamp < current.expiresAt) return;
-        try lottery.expireRound(roundId) {
-            _rememberTerminal(roundId, RoundStatus.Expired);
-        } catch { }
-    }
-
     function settleRound(uint256 rawRound, uint256 randomnessSeed) external {
         uint256 roundId = _selectRound(rawRound);
         if (roundId == 0) return;
         Round memory current = lotteryView.round(roundId);
-        if (current.status != RoundStatus.SoldOut) return;
+        if (
+            current.status != RoundStatus.SoldOut
+                && !(current.status == RoundStatus.Open && block.timestamp >= current.expiresAt)
+        ) return;
         registry.cache(
             current.drandRound,
             keccak256(abi.encode(roundId, randomnessSeed)),
-            current.selloutAt + 1
+            (current.status == RoundStatus.SoldOut ? current.selloutAt : current.expiresAt) + 1
         );
         try settlement.settleRound(roundId, "") {
             _rememberTerminal(roundId, RoundStatus.Settled);
@@ -243,16 +236,6 @@ contract LotteryStateHandler is Test {
         if (current.status != RoundStatus.Settled || current.winnerClaimable == 0) return;
         vm.prank(current.winner);
         try claims.claimWinner(roundId, current.winner) { } catch { }
-    }
-
-    function claimRefund(uint256 rawRound, uint256 actorSeed) external {
-        uint256 roundId = _selectRound(rawRound);
-        if (roundId == 0) return;
-        if (lotteryView.round(roundId).status != RoundStatus.Expired) return;
-        address actor = actorSeed % 2 == 0 ? alice : bob;
-        if (lotteryView.refundableAmount(roundId, actor) == 0) return;
-        vm.prank(actor);
-        try claims.claimRefund(roundId, actor) { } catch { }
     }
 
     function claimFinalizer(uint256 rawAsset) external {
@@ -359,21 +342,19 @@ contract LotteryInvariantTest is StdInvariant, LotteryIntegrationSetup {
             address(diamond), authority, alice, bob, registry, router, tokenA, tokenB
         );
 
-        bytes4[] memory selectors = new bytes4[](14);
+        bytes4[] memory selectors = new bytes4[](12);
         selectors[0] = LotteryStateHandler.openRound.selector;
         selectors[1] = LotteryStateHandler.buyTickets.selector;
         selectors[2] = LotteryStateHandler.advanceTime.selector;
-        selectors[3] = LotteryStateHandler.expireRound.selector;
-        selectors[4] = LotteryStateHandler.settleRound.selector;
-        selectors[5] = LotteryStateHandler.claimWinner.selector;
-        selectors[6] = LotteryStateHandler.claimRefund.selector;
-        selectors[7] = LotteryStateHandler.claimFinalizer.selector;
-        selectors[8] = LotteryStateHandler.flushOperator.selector;
-        selectors[9] = LotteryStateHandler.flushTreasury.selector;
-        selectors[10] = LotteryStateHandler.setPaused.selector;
-        selectors[11] = LotteryStateHandler.setConfigEnabled.selector;
-        selectors[12] = LotteryStateHandler.updateIntegration.selector;
-        selectors[13] = LotteryStateHandler.setMaxActiveRounds.selector;
+        selectors[3] = LotteryStateHandler.settleRound.selector;
+        selectors[4] = LotteryStateHandler.claimWinner.selector;
+        selectors[5] = LotteryStateHandler.claimFinalizer.selector;
+        selectors[6] = LotteryStateHandler.flushOperator.selector;
+        selectors[7] = LotteryStateHandler.flushTreasury.selector;
+        selectors[8] = LotteryStateHandler.setPaused.selector;
+        selectors[9] = LotteryStateHandler.setConfigEnabled.selector;
+        selectors[10] = LotteryStateHandler.updateIntegration.selector;
+        selectors[11] = LotteryStateHandler.setMaxActiveRounds.selector;
         targetContract(address(handler));
         targetSelector(FuzzSelector({ addr: address(handler), selectors: selectors }));
     }
@@ -392,6 +373,17 @@ contract LotteryInvariantTest is StdInvariant, LotteryIntegrationSetup {
             uint256 roundId = handler.roundIdAt(i);
             Round memory current = stateView.round(roundId);
             assertLe(current.soldTickets, current.config.ticketCount);
+            assertGt(current.soldTickets, 0);
+            uint64 cutoff = current.selloutAt == 0 ? current.expiresAt : current.selloutAt;
+            assertEq(
+                current.drandRound,
+                registry.firstRoundAfter(uint256(cutoff) + current.config.randomnessDelay)
+            );
+            assertTrue(current.status != RoundStatus.Expired);
+            if (current.status == RoundStatus.Settled) {
+                assertLt(current.winningTicket, current.soldTickets);
+                assertEq(current.winner, stateView.ticketOwner(roundId, current.winningTicket));
+            }
             assertEq(_immutableRoundHash(current), handler.recordedSnapshotHash(roundId));
 
             if (current.status == RoundStatus.Open || current.status == RoundStatus.SoldOut) {
@@ -419,7 +411,6 @@ contract LotteryInvariantTest is StdInvariant, LotteryIntegrationSetup {
     function _assertLedgerAggregates(address asset) private view {
         uint256 activeEscrow;
         uint256 winnerLiability;
-        uint256 refundLiability;
         uint256 count = handler.roundCount();
         for (uint256 i; i < count; ++i) {
             uint256 roundId = handler.roundIdAt(i);
@@ -429,16 +420,13 @@ contract LotteryInvariantTest is StdInvariant, LotteryIntegrationSetup {
                 activeEscrow += current.receipts;
             } else if (current.status == RoundStatus.Settled) {
                 winnerLiability += current.winnerClaimable;
-            } else if (current.status == RoundStatus.Expired) {
-                refundLiability += stateView.refundableAmount(roundId, alice);
-                refundLiability += stateView.refundableAmount(roundId, bob);
             }
         }
 
         AssetAccounting memory accounting = stateView.assetAccounting(asset);
         assertEq(accounting.activeRoundEscrow, activeEscrow);
         assertEq(accounting.winnerLiability, winnerLiability);
-        assertEq(accounting.refundLiability, refundLiability);
+        assertEq(accounting.refundLiability, 0);
         assertEq(accounting.finalizerLiability, stateView.finalizerCredit(asset, address(handler)));
 
         (, uint64 currentVersion) = stateView.currentIntegration();

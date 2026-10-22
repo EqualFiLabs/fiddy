@@ -29,6 +29,7 @@ library LibLotteryStorage {
         mapping(uint64 version => bool enabled) configEnabled;
         mapping(uint256 roundId => Round round) rounds;
         mapping(uint256 roundId => TicketRange[] entries) entries;
+        // Reserved legacy storage slot; deadline-draw purchases do not create refund credits.
         mapping(uint256 roundId => mapping(address user => uint256 amount)) refundCredit;
         mapping(uint64 configVersion => uint256 roundId) activeRoundForConfig;
     }

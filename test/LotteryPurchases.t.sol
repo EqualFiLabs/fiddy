@@ -269,14 +269,14 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.activeRoundCount(), 1);
         assertEq(tokenA.balanceOf(alice), 970);
         assertEq(tokenA.balanceOf(address(diamond)), 30);
-        assertEq(stateView.refundCredit(roundId, alice), 30);
+        assertEq(stateView.refundCredit(roundId, alice), 0);
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 30);
         assertEq(stateView.purchaseEntryCount(roundId), 1);
         assertEq(stateView.ticketOwner(roundId, 0), alice);
         assertEq(stateView.ticketOwner(roundId, 2), alice);
     }
 
-    function test_AdditionalPurchasesAppendRangesAndAccumulateRefundBasis() public {
+    function test_AdditionalPurchasesAppendRangesWithoutRefundCredits() public {
         vm.prank(alice);
         uint256 roundId = lottery.openRound(1, 2);
         vm.prank(bob);
@@ -292,8 +292,8 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.ticketOwner(roundId, 2), bob);
         assertEq(stateView.ticketOwner(roundId, 4), bob);
         assertEq(stateView.ticketOwner(roundId, 5), alice);
-        assertEq(stateView.refundCredit(roundId, alice), 30);
-        assertEq(stateView.refundCredit(roundId, bob), 30);
+        assertEq(stateView.refundCredit(roundId, alice), 0);
+        assertEq(stateView.refundCredit(roundId, bob), 0);
     }
 
     function test_ConcurrentTokensKeepCustodyAndAccountingIsolated() public {
@@ -336,30 +336,6 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.roundState(roundId).soldTickets, 2);
     }
 
-    function test_ExpirationReclassifiesOnlyRoundTokenPrincipal() public {
-        vm.prank(alice);
-        uint256 roundA = lottery.openRound(1, 2);
-        vm.prank(bob);
-        uint256 roundB = lottery.openRound(2, 3);
-        Round memory beforeExpiration = stateView.roundState(roundA);
-
-        vm.warp(beforeExpiration.expiresAt);
-        lottery.expireRound(roundA);
-
-        Round memory expired = stateView.roundState(roundA);
-        AssetAccounting memory accountingA = stateView.assetAccounting(address(tokenA));
-        AssetAccounting memory accountingB = stateView.assetAccounting(address(tokenB));
-        assertEq(uint8(expired.status), uint8(RoundStatus.Expired));
-        assertEq(stateView.activeRoundCount(), 1);
-        assertEq(accountingA.activeRoundEscrow, 0);
-        assertEq(accountingA.refundLiability, 20);
-        assertEq(accountingA.treasuryAvailable, 0);
-        assertEq(accountingA.pendingOperatorRevenueTotal, 0);
-        assertEq(accountingB.activeRoundEscrow, 21);
-        assertEq(accountingB.refundLiability, 0);
-        assertEq(uint8(stateView.roundState(roundB).status), uint8(RoundStatus.Open));
-    }
-
     function test_SelloutCommitsStrictlyFutureUncachedDrandRound() public {
         vm.prank(alice);
         uint256 roundId = lottery.openRound(1, 5);
@@ -377,10 +353,6 @@ contract LotteryPurchasesTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
         vm.prank(alice);
         lottery.buyTickets(roundId, 1);
-
-        vm.warp(round.expiresAt);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
-        lottery.expireRound(roundId);
     }
 
     function test_FirstPurchaseCanAtomicallySellOut() public {
@@ -409,8 +381,7 @@ contract LotteryPurchasesTest is Test {
         vm.prank(bob);
         lottery.buyTickets(roundId, 1);
 
-        lottery.expireRound(roundId);
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Expired));
+        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Open));
     }
 
     function test_RejectsCachedTargetAndRollsBackFinalPurchase() public {
@@ -428,7 +399,7 @@ contract LotteryPurchasesTest is Test {
         assertEq(uint8(round.status), uint8(RoundStatus.Open));
         assertEq(round.soldTickets, 5);
         assertEq(round.receipts, 50);
-        assertEq(round.drandRound, 0);
+        assertEq(round.drandRound, registry.firstRoundAfter(uint256(round.expiresAt) + 30));
         assertEq(tokenA.balanceOf(bob), bobBefore);
         assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 50);
     }
@@ -440,16 +411,13 @@ contract LotteryPurchasesTest is Test {
             IntegrationConfig(address(invalidRegistry), address(router))
         );
 
-        vm.prank(alice);
-        uint256 roundId = lottery.openRound(2, 3);
         vm.expectRevert(abi.encodeWithSelector(Errors.InvalidRandomnessRound.selector, 1));
-        vm.prank(bob);
-        lottery.buyTickets(roundId, 3);
-
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Open));
+        vm.prank(alice);
+        lottery.openRound(2, 3);
+        assertEq(stateView.activeRoundCount(), 0);
     }
 
-    function test_PauseBlocksParticipationButNotExpiration() public {
+    function test_PauseBlocksParticipation() public {
         vm.prank(alice);
         uint256 roundId = lottery.openRound(1, 1);
         Round memory round = stateView.roundState(roundId);
@@ -464,8 +432,7 @@ contract LotteryPurchasesTest is Test {
         lottery.openRound(2, 1);
 
         vm.warp(round.expiresAt);
-        lottery.expireRound(roundId);
-        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Expired));
+        assertEq(uint8(stateView.roundState(roundId).status), uint8(RoundStatus.Open));
     }
 
     function test_RejectsInvalidConfigQuantityLimitAndOpeningPolicy() public {
@@ -656,46 +623,6 @@ contract LotteryPurchasesTest is Test {
         assertEq(stateView.roundState(roundId).soldTickets, 4);
     }
 
-    function test_ExpiredRoundCannotReopenOrReachSellout() public {
-        vm.prank(alice);
-        uint256 roundId = lottery.openRound(1, 5);
-        Round memory open = stateView.roundState(roundId);
-        vm.warp(open.expiresAt);
-        lottery.expireRound(roundId);
-
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
-        vm.prank(bob);
-        lottery.buyTickets(roundId, 5);
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotOpen.selector, roundId));
-        lottery.expireRound(roundId);
-
-        Round memory expired = stateView.roundState(roundId);
-        assertEq(uint8(expired.status), uint8(RoundStatus.Expired));
-        assertEq(expired.soldTickets, 5);
-        assertEq(expired.drandRound, 0);
-        assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 50);
-    }
-
-    function test_ExpiredRoundReleasesGlobalCapacityWithoutCrossTokenEffects() public {
-        vm.prank(alice);
-        uint256 roundA = lottery.openRound(1, 2);
-        vm.prank(bob);
-        uint256 roundB = lottery.openRound(2, 2);
-
-        vm.warp(stateView.roundState(roundA).expiresAt);
-        lottery.expireRound(roundA);
-        vm.prank(alice);
-        uint256 replacement = lottery.openRound(1, 1);
-
-        assertEq(stateView.activeRoundCount(), 2);
-        assertEq(uint8(stateView.roundState(roundB).status), uint8(RoundStatus.Open));
-        assertEq(uint8(stateView.roundState(replacement).status), uint8(RoundStatus.Open));
-        assertEq(stateView.assetAccounting(address(tokenA)).refundLiability, 20);
-        assertEq(stateView.assetAccounting(address(tokenA)).activeRoundEscrow, 10);
-        assertEq(stateView.assetAccounting(address(tokenB)).activeRoundEscrow, 14);
-        assertEq(stateView.assetAccounting(address(tokenB)).refundLiability, 0);
-    }
-
     function test_RequiresConfiguredIntegration() public {
         DiamondCutFacet cutFacet = new DiamondCutFacet();
         StaticsLotteryDiamond candidate = new StaticsLotteryDiamond(authority, address(cutFacet));
@@ -774,10 +701,9 @@ contract LotteryPurchasesTest is Test {
     }
 
     function _lotterySelectors() private pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](3);
+        selectors = new bytes4[](2);
         selectors[0] = ILottery.openRound.selector;
         selectors[1] = ILottery.buyTickets.selector;
-        selectors[2] = ILottery.expireRound.selector;
     }
 
     function _stateSelectors() private pure returns (bytes4[] memory selectors) {
