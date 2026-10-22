@@ -7,6 +7,8 @@ decision, not a production deployment approval. The Robinhood Testnet deployment
 disposable lifecycle rehearsal, and production governance, roles, integrations, and Payment Tokens
 must be approved separately.
 
+Current deadline-draw source evidence is recorded in [the dedicated formal report](../formal/reports/lottery-deadline-draws.md): 15/15 required rules pass for its pinned candidate. The old testnet lifecycle below remains historical; a fresh deadline-draw deployment has not been rehearsed.
+
 ## Candidate lineage
 
 - The deployed Lottery source snapshot is
