@@ -199,17 +199,19 @@ contract LotteryDeadlineCommitmentHarness is LotteryFacet {
         result.targetAfterCalls = round.drandRound;
     }
 
-    function seedPurchaseBoundary(uint64 deadline) external {
-        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+    function seedPurchaseBoundary(uint256 roundId, uint64 deadline, FormalToken token) external {
+        Round storage round = LibLotteryStorage.gameStorage().rounds[roundId];
         round.status = RoundStatus.Open;
         round.expiresAt = deadline;
+        round.config.paymentToken = address(token);
+        round.config.ticketPrice = 10;
         round.config.ticketCount = 10;
         round.soldTickets = 1;
         round.receipts = 10;
     }
 
-    function purchaseState() external view returns (uint32 sold, uint256 receipts) {
-        Round storage round = LibLotteryStorage.gameStorage().rounds[1];
+    function purchaseState(uint256 roundId) external view returns (uint32 sold, uint256 receipts) {
+        Round storage round = LibLotteryStorage.gameStorage().rounds[roundId];
         return (round.soldTickets, round.receipts);
     }
 }
@@ -219,10 +221,17 @@ contract LotteryDeadlineSettlementHarness is SettlementFacet {
         LibReentrancy.initialize();
     }
 
-    function seedDeadlineRound(FormalRegistry registry, uint32 sold) external {
+    function seedDeadlineRound(
+        uint256 roundId,
+        uint64 integrationVersion,
+        address paymentToken,
+        FormalRegistry registry,
+        uint32 sold
+    ) external {
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        Round storage round = gs.rounds[1];
+        Round storage round = gs.rounds[roundId];
         round.status = RoundStatus.Open;
+        round.config.paymentToken = paymentToken;
         round.config.ticketCount = sold + 1;
         round.config.winnerBps = 8000;
         round.config.operatorProtocolBps = 5000;
@@ -230,21 +239,22 @@ contract LotteryDeadlineSettlementHarness is SettlementFacet {
         round.receipts = sold;
         round.expiresAt = 1;
         round.drandRound = 2;
-        round.integrationVersion = 1;
+        round.integrationVersion = integrationVersion;
         gs.activeRoundCount = 1;
         gs.activeRoundForConfig[0] = 1;
-        gs.entries[1].push(TicketRange(msg.sender, sold));
-        LibLotteryStorage.integrationStorage().integrations[1].drandRegistry = address(registry);
-        LibLotteryStorage.accountingStorage().assetAccounting[address(0)].activeRoundEscrow = sold;
+        gs.entries[roundId].push(TicketRange(msg.sender, sold));
+        LibLotteryStorage.integrationStorage().integrations[integrationVersion].drandRegistry =
+            address(registry);
+        LibLotteryStorage.accountingStorage().assetAccounting[paymentToken].activeRoundEscrow = sold;
     }
 
-    function observe()
+    function observe(uint256 roundId, address paymentToken)
         external
         view
         returns (Round memory round, AssetAccounting memory accounting)
     {
-        round = LibLotteryStorage.gameStorage().rounds[1];
-        accounting = LibLotteryStorage.accountingStorage().assetAccounting[address(0)];
+        round = LibLotteryStorage.gameStorage().rounds[roundId];
+        accounting = LibLotteryStorage.accountingStorage().assetAccounting[paymentToken];
     }
 }
 
