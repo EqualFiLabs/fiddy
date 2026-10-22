@@ -1,5 +1,15 @@
 # Deadline-draw formal verification
 
+## Cleanup revalidation
+
+Current executable candidate: `459d63832e3a807824940cc52c542f05b5aedced`. The following evidence commit changes documentation only. All **15 required rules pass again** on TFDEVM001 with zero counterexamples, bounded-loop warnings, or failed rules and at least one successful path per rule. Proof inputs, dependency file hashes, compiler, tools, configuration, bounds, and assumptions match the original run below. Path counts and all current runtime hashes are recorded in the [cleanup evidence](../evidence/lottery-halmos-459d638.json).
+
+The clean source and raw results are retained in `~/formal-workspaces/fiddy-deadline-draws-459d638/` on TFDEVM001 and locally in ignored `.tooling/formal-459d638/`. SettlementFacet now has 3460 runtime bytes, full Keccak-256 `0xbd4a101703dca284518fbb33c9a34e4642ea506853bfb4ac116dedf0876a4a6a`, and metadata-stripped logic hash `0xac89ca98bc620e80ba5c7f9203021059a36a25c9e5ff06d8a7b7e7d4c0af1570`. The production change removes redundant registry cache checks; unit tests separately cover posting, cached randomness, rejected proofs, reentrancy, and unavailable cache regardless of the posting return value. The formal deadline settlement model uses a cached Registry summary and does not prove Registry posting behavior.
+
+The cutoff mutation was not rerun: its production guard and proof inputs are unchanged. That mutation result remains bound to the original candidate below. No live deployment or new real Registry/Router rehearsal is claimed.
+
+## Original deadline-draw candidate
+
 Source candidate: `46eac320393f9258370522e7c923220da7a6571e`. The following documentation-only evidence commit does not change executable source or proof inputs.
 
 ## Result
@@ -60,3 +70,12 @@ The existing allocation/claim/Operator/finalization domains remain documented in
 The trusted base includes Solidity compilation, Halmos EVM semantics, Z3, Keccak, exact-transfer token summaries, dependency summaries, and seeded preconditions. Registry cryptography, Router distribution, arbitrary ERC-20 behavior, external liveness, governance honesty, compiler/client correctness, and malicious sequencer ordering or timestamps are outside this proof. Honest Robinhood ordering and timestamp progression remain an explicit assumption.
 
 This is fresh-deployment source evidence. It does not attest to a deployed deadline-draw Diamond. Full CI, independent agent review, local tests, historical Registry assurance, and any future real Registry/Router testnet rehearsal are separate evidence layers. Historical refund proofs remain pinned to their original release.
+
+## Dependency pin recovery
+
+The Router gitlink now points to reachable commit `a6afe541c6261f1febb2eaf0f4d68ef5aa16548e`
+in place of unavailable commit `f98a17780cb250ce28f446ab54eb078512fb2e0b`. Comparing the two
+Router snapshots shows only the removal of two README lines; contracts, tests, compiler
+configuration, dependency pins, and all other files are identical. The original proof commits,
+dependency hashes, bounds, and results above remain unchanged. This checkout repair does not
+claim a new formal run or alter the historical deployment records.

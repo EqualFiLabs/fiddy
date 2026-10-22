@@ -37,7 +37,7 @@ Burntato's governance implementation exposes `finalizeProtocol()`, which permane
 
 Burntato also isolates protocol domains into deterministic namespaced storage slots rather than relying on a single monolithic Diamond storage struct. The Lottery SHALL follow this pattern.
 
-The Operator Fee Router implementation proposed in `EqualFiLabs/operator-fee-router` PR #2 at commit `b8faeb839a2e9981b6d6f4fee46b07608481ec64` exposes a stable permissionless ERC-20 ingress:
+The Operator Fee Router implementation pinned from `EqualFiLabs/operator-fee-router` PR #1 at commit `a6afe541c6261f1febb2eaf0f4d68ef5aa16548e` exposes a stable permissionless ERC-20 ingress:
 
 ```solidity
 function addRewards(address asset, uint256 amount) external;

@@ -22,8 +22,8 @@ Current deadline-draw source evidence is recorded in [the dedicated formal repor
 - No production Solidity changed after the deployed source snapshot. The exact pull-request head
   and its terminal CI run are the authoritative final candidate evidence.
 
-The source of truth and complete review boundary are listed in
-[`audit-scope.md`](audit-scope.md).
+The normative source of truth is the [requirements](../specs/requirements.md) and
+[design](../specs/design.md).
 
 ## Independent review disposition
 
@@ -40,8 +40,9 @@ chain-specific behavior, and access control.
   shapes, and the complete lifecycle manifest subsequently validated on Robinhood Testnet chain
   `46630`.
 
-These results do not remove the explicit trust assumptions and production-deployment gaps in
-[`audit-scope.md`](audit-scope.md).
+These results do not remove the trust assumptions and production-deployment gaps documented in
+[the randomness model](randomness.md#trusted-computing-base-and-exclusions) and
+[the governance deployment checklist](governance.md#deployment-checklist).
 
 ## Final invariant review
 
