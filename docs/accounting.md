@@ -169,7 +169,7 @@ its own then-current synchronized weights. See
 `flushTreasury(asset, amount)` is permissionless, but its receiver is always the current
 governance-configured Treasury recipient. The caller cannot redirect it. The function caps `amount`
 at `treasuryAvailable`, decreases that field before interaction, and requires an exact outbound
-transfer. Winner, refund, finalizer, and Operator liabilities are never Treasury-withdrawable.
+transfer. Winner, finalizer, and Operator liabilities are never Treasury-withdrawable. The reserved refund-liability field remains protected in solvency accounting and stays zero for new Rounds.
 
 Changing the Treasury recipient affects later delivery of already-recorded Treasury funds, but it
 does not change any participant or Operator entitlement.

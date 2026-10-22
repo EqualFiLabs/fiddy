@@ -75,12 +75,11 @@ contract SettlementFacet is ISettlement {
         IEqualFiDrandRegistry registry = IEqualFiDrandRegistry(integration.drandRegistry);
         uint64 drandRound = round.drandRound;
         if (!registry.hasSig(drandRound)) {
-            bool newlyStored = registry.postSig(drandRound, quicknetSignature);
-            if (!newlyStored && !registry.hasSig(drandRound)) {
+            registry.postSig(drandRound, quicknetSignature);
+            if (!registry.hasSig(drandRound)) {
                 revert Errors.RandomnessUnavailable(drandRound);
             }
         }
-        if (!registry.hasSig(drandRound)) revert Errors.RandomnessUnavailable(drandRound);
 
         uint64 postedAt = registry.postedAt(drandRound);
         uint64 salesCloseAt =

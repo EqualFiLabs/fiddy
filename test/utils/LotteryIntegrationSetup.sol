@@ -39,17 +39,12 @@ contract ConfiguredDrandRegistry is IEqualFiDrandRegistry {
     mapping(uint64 round => bytes32 randomness) internal randomness;
     mapping(uint64 round => uint64 timestamp) internal postingTimes;
     mapping(uint64 round => bytes32 proofHash) internal expectedProofHashes;
-    bool internal returnWithoutStoring;
 
     error InvalidProof();
     error ProofTooEarly();
 
     function expectProof(uint64 round, bytes calldata proof) external {
         expectedProofHashes[round] = keccak256(proof);
-    }
-
-    function setReturnWithoutStoring(bool enabled) external {
-        returnWithoutStoring = enabled;
     }
 
     function cache(uint64 round, bytes32 value, uint64 timestamp) external {
@@ -80,7 +75,6 @@ contract ConfiguredDrandRegistry is IEqualFiDrandRegistry {
 
     function postSig(uint64 round, bytes calldata signature) external returns (bool newlyStored) {
         if (signatures[round]) return false;
-        if (returnWithoutStoring) return false;
         if (block.timestamp < roundTime(round)) revert ProofTooEarly();
         if (
             expectedProofHashes[round] == bytes32(0)

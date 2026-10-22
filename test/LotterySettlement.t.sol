@@ -127,11 +127,16 @@ contract LotterySettlementTest is LotteryIntegrationSetup {
         assertEq(stateView.round(roundId).applicationSeed, expectedSeed);
     }
 
-    function test_RejectsUnavailableRandomnessWithoutChangingSettlementState() public {
+    function testFuzz_RejectsUnavailableRandomnessRegardlessOfPostReturn(bool newlyStored) public {
         uint256 roundId = _sellOutRoundA();
         Round memory soldOut = stateView.round(roundId);
         vm.warp(registry.roundTime(soldOut.drandRound));
-        registry.setReturnWithoutStoring(true);
+        // A registry return value alone cannot establish that randomness is available.
+        vm.mockCall(
+            address(registry),
+            abi.encodeCall(IEqualFiDrandRegistry.postSig, (soldOut.drandRound, hex"1234")),
+            abi.encode(newlyStored)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(Errors.RandomnessUnavailable.selector, soldOut.drandRound)

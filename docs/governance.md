@@ -50,7 +50,7 @@ An independent enable flag controls whether a version may open a future Round. D
 - prevents only new `openRound` calls;
 - does not close or mutate an existing Round;
 - does not change the Round's token, economics, deadline, or beacon; and
-- does not block settlement, expiration, claims, or revenue delivery.
+- does not block settlement, claims, or revenue delivery.
 
 Re-enabling the same version permits a new Round after its prior Round is terminal, subject to the
 global concurrency limit.

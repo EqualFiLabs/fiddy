@@ -46,7 +46,7 @@ An immutable governance-created Round Configuration that may be enabled or disab
 
 **Payment Token**
 
-The governance-approved ERC-20 token in which a Round's ticket price, receipts, liabilities, revenue, claims, and refunds are denominated.
+The governance-approved ERC-20 token in which a Round's ticket price, receipts, liabilities, revenue, and claims are denominated.
 
 **Configuration Snapshot**
 
@@ -82,7 +82,7 @@ The standalone shared EqualFi infrastructure contract responsible for verifying 
 
 **Quicknet Round**
 
-A specific drand Quicknet beacon round selected as the randomness source for a sold-out lottery Round.
+A specific drand Quicknet beacon round selected as the randomness source for a lottery Round, scheduled at opening and deterministically rescheduled on early Sellout.
 
 **OperatorFeeRouter**
 
@@ -307,9 +307,9 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 
 #### Acceptance Criteria
 
-1. THE Lottery SHALL separately account by ERC-20 token for Treasury revenue, Winner liabilities, refund liabilities, Finalizer liabilities, and Pending Operator Revenue.
+1. THE Lottery SHALL separately account by ERC-20 token for Treasury revenue, Winner liabilities, Finalizer liabilities, and Pending Operator Revenue. The reserved refund-liability field SHALL remain zero for new Rounds.
 2. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding winner claim.
-3. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding refund or Finalizer claim.
+3. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding Finalizer claim.
 4. THE Treasury SHALL NOT be able to withdraw Pending Operator Revenue.
 5. THE Lottery SHALL permit only legitimately available Treasury revenue or provable surplus to leave through Treasury-controlled paths.
 6. Treasury withdrawal authority SHALL NOT modify Round outcomes or liabilities.
@@ -413,7 +413,7 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 4. THE Lottery SHALL expose ticket sales progress.
 5. THE Lottery SHALL expose the scheduled Quicknet Round from opening and emit every deterministic early-Sellout rescheduling.
 6. THE Lottery SHALL expose the winning ticket and winner after settlement.
-7. THE Lottery SHALL expose outstanding winner, refund, Finalizer, Treasury, and Operator accounting by token needed to verify solvency.
+7. THE Lottery SHALL expose outstanding winner, Finalizer, Treasury, and Operator accounting by token needed to verify solvency, retaining the reserved refund-liability field for storage compatibility.
 8. THE Lottery SHALL emit events sufficient for an indexer to reconstruct Round opening, purchases, Sellout, randomness commitment, settlement, claims, deadline scheduling, configuration changes, Treasury movement, and Operator revenue flushing.
 
 ### Requirement 22: External Dependency Isolation

@@ -312,10 +312,7 @@ contract LotteryStateHandler is Test {
     }
 
     function _rememberTerminal(uint256 roundId, RoundStatus status) private {
-        if (
-            observedTerminalStatus[roundId] == RoundStatus.None
-                && (status == RoundStatus.Settled || status == RoundStatus.Expired)
-        ) {
+        if (observedTerminalStatus[roundId] == RoundStatus.None && status == RoundStatus.Settled) {
             observedTerminalStatus[roundId] = status;
         }
     }

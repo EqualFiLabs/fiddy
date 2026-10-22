@@ -1,12 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${ROBINHOOD_TESTNET:?ROBINHOOD_TESTNET must be set}"
-
 cast_bin=${CAST_BIN:-cast}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/.." && pwd)
 manifest="${1:-$repo_root/deployments/robinhood-testnet/lifecycle.json}"
+
+# Only the pinned historical artifact may omit its lifecycle model.
+lifecycle_model=$(jq -er '
+    if has("lifecycleModel") then
+        .lifecycleModel | if type == "string" and length > 0 then . else error("invalid lifecycleModel") end
+    else "unspecified" end
+' "$manifest")
+case "$lifecycle_model" in
+    legacy|deadline-draws) ;;
+    unspecified)
+        if [[ "$manifest" -ef "$repo_root/deployments/robinhood-testnet/lifecycle.json" ]] \
+            && jq -e 'has("lifecycleModel") | not' "$manifest" >/dev/null; then
+            lifecycle_model=legacy
+        else
+            echo "lifecycleModel must be explicit for non-historical manifests" >&2
+            exit 1
+        fi
+        ;;
+    *) echo "unsupported lifecycleModel: $lifecycle_model" >&2; exit 1 ;;
+esac
+
+: "${ROBINHOOD_TESTNET:?ROBINHOOD_TESTNET must be set}"
 
 assert_equal() {
     local actual=$1
@@ -100,7 +120,7 @@ while IFS= read -r encoded_round; do
             "$(jq -r ".$field" <<<"$expected")" \
             "Round $round_id $field"
     done
-    if [[ $(jq -r '.lifecycleModel // "legacy"' "$manifest") == deadline-draws ]]; then
+    if [[ $lifecycle_model == deadline-draws ]]; then
         sold=$(jq -r '.[0][16]' <<<"$live")
         cap=$(jq -r '.[0][2]' <<<"$live")
         winning=$(jq -r '.[0][17]' <<<"$live")
@@ -141,7 +161,7 @@ CHECK
     fi
 done < <(jq -r '.rounds[] | @base64' "$manifest")
 
-if [[ $(jq -r '.lifecycleModel // "legacy"' "$manifest") == deadline-draws ]]; then
+if [[ $lifecycle_model == deadline-draws ]]; then
     jq -e '.deadlineDrawRoundIds | length > 0' "$manifest" >/dev/null
     while IFS= read -r id; do
         jq -e --argjson id "$id" 'any(.rounds[]; .roundId == $id) and any(.quicknet[]; .roundId == $id)' "$manifest" >/dev/null

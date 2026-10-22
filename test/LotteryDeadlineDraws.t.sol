@@ -3,13 +3,7 @@ pragma solidity 0.8.30;
 
 import { ILottery } from "../src/interfaces/ILottery.sol";
 import { Errors } from "../src/shared/Errors.sol";
-import {
-    AssetAccounting,
-    IntegrationConfig,
-    LotteryConfig,
-    Round,
-    RoundStatus
-} from "../src/shared/Types.sol";
+import { AssetAccounting, IntegrationConfig, Round, RoundStatus } from "../src/shared/Types.sol";
 import {
     ConfiguredDrandRegistry,
     IntegrationToken,
