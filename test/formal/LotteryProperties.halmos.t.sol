@@ -99,7 +99,8 @@ contract LotteryDeadlineHalmosTest is Test {
     }
 
     function check_deadlineRejectsPrematureSettlement(uint256 rawSold) public {
-        uint32 sold = uint32(bound(rawSold, 1, type(uint32).max - 1));
+        vm.assume(rawSold > 0 && rawSold < type(uint32).max);
+        uint32 sold = uint32(rawSold);
         LotteryDeadlineSettlementHarness lottery = new LotteryDeadlineSettlementHarness();
         FormalRegistry registry = new FormalRegistry(true);
         lottery.seedDeadlineRound(1, 1, address(0), registry, sold);
@@ -116,7 +117,8 @@ contract LotteryDeadlineHalmosTest is Test {
     }
 
     function check_deadlineWinnerIsSoldAndRevenueConserved(uint256 rawSold) public {
-        uint32 sold = uint32(bound(rawSold, 1, type(uint32).max - 1));
+        vm.assume(rawSold > 0 && rawSold < type(uint32).max);
+        uint32 sold = uint32(rawSold);
         LotteryDeadlineSettlementHarness lottery = new LotteryDeadlineSettlementHarness();
         FormalRegistry registry = new FormalRegistry(true);
         lottery.seedDeadlineRound(1, 1, address(0), registry, sold);

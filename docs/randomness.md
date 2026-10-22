@@ -12,10 +12,7 @@ The release-critical Registry claim is:
 > `EqualFiDrandRegistry` corresponds to a valid Quicknet signature for exactly that Round,
 > produces one canonical Round-bound randomness value, and can never be replaced.
 
-The Lottery formal package proves a different and narrower connection: once a Round sells out,
-the production commitment routine stores the Registry-selected target strictly after the supplied
-L2 timestamp boundary, later configuration-catalog changes do not alter it, and settlement/accounting
-uses the resulting immutable Round state. It does not re-prove Registry cryptography.
+The Lottery formal package checks a narrower application boundary: production helpers schedule the Registry-selected target strictly after the opening deadline or early-sellout boundary, and later configuration-catalog changes do not alter it. Deadline rules exercise the purchase cutoff, settlement readiness, sold-ticket winner selection, and actual-receipt accounting under documented synthetic preconditions. See the candidate-specific report in `formal/reports/` for completed results and bounds. These rules do not re-prove Registry cryptography.
 
 ## Deadline and sellout schedules
 
