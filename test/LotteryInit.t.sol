@@ -226,7 +226,7 @@ contract LotteryInitTest is Test {
     }
 
     function _viewSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](17);
+        selectors = new bytes4[](16);
         selectors[0] = ILotteryView.latestLotteryConfigVersion.selector;
         selectors[1] = ILotteryView.latestRoundId.selector;
         selectors[2] = ILotteryView.round.selector;
@@ -234,16 +234,15 @@ contract LotteryInitTest is Test {
         selectors[4] = ILotteryView.ticketOwner.selector;
         selectors[5] = ILotteryView.purchaseEntryCount.selector;
         selectors[6] = ILotteryView.purchaseEntry.selector;
-        selectors[7] = ILotteryView.refundableAmount.selector;
-        selectors[8] = ILotteryView.lotteryConfig.selector;
-        selectors[9] = ILotteryView.currentIntegration.selector;
-        selectors[10] = ILotteryView.integrationAt.selector;
-        selectors[11] = ILotteryView.activeRoundCount.selector;
-        selectors[12] = ILotteryView.maxActiveRounds.selector;
-        selectors[13] = ILotteryView.pendingOperatorRevenue.selector;
-        selectors[14] = ILotteryView.assetAccounting.selector;
-        selectors[15] = ILotteryView.finalizerCredit.selector;
-        selectors[16] = ILotteryView.activeRoundForConfig.selector;
+        selectors[7] = ILotteryView.lotteryConfig.selector;
+        selectors[8] = ILotteryView.currentIntegration.selector;
+        selectors[9] = ILotteryView.integrationAt.selector;
+        selectors[10] = ILotteryView.activeRoundCount.selector;
+        selectors[11] = ILotteryView.maxActiveRounds.selector;
+        selectors[12] = ILotteryView.pendingOperatorRevenue.selector;
+        selectors[13] = ILotteryView.assetAccounting.selector;
+        selectors[14] = ILotteryView.finalizerCredit.selector;
+        selectors[15] = ILotteryView.activeRoundForConfig.selector;
     }
 
     function _revenueSelectors() internal pure returns (bytes4[] memory selectors) {

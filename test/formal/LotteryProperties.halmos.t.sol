@@ -12,7 +12,8 @@ import { RevenueFacet } from "../../src/facets/RevenueFacet.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
 import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { FacetCut, FacetCutAction } from "../../src/shared/DiamondTypes.sol";
-import { AssetAccounting, RoundStatus } from "../../src/shared/Types.sol";
+import { Errors } from "../../src/shared/Errors.sol";
+import { AssetAccounting, Round, RoundStatus } from "../../src/shared/Types.sol";
 import {
     AllocationObservation,
     ClaimObservation,
@@ -22,6 +23,8 @@ import {
     FormalToken,
     LotteryClaimsHarness,
     LotteryCommitmentHarness,
+    LotteryDeadlineCommitmentHarness,
+    LotteryDeadlineSettlementHarness,
     LotteryRevenueHarness,
     LotterySettlementHarness,
     RevenueObservation,
@@ -54,6 +57,85 @@ contract LotteryCommitmentHalmosTest is Test {
         FormalRegistry registry = new FormalRegistry(false);
         LotteryCommitmentHarness lottery = new LotteryCommitmentHarness();
         observed = lottery.executeCommitment(registry, delay);
+    }
+}
+
+contract LotteryDeadlineHalmosTest is Test {
+    function check_deadlineCommitmentIsFutureAndFixed(uint256 rawDuration, uint256 rawDelay)
+        public
+    {
+        uint32 duration = uint32(bound(rawDuration, 1, type(uint32).max));
+        uint32 delay = uint32(bound(rawDelay, 0, type(uint32).max));
+        FormalRegistry registry = new FormalRegistry(false);
+        LotteryDeadlineCommitmentHarness lottery = new LotteryDeadlineCommitmentHarness();
+        CommitmentObservation memory result =
+            lottery.executeDeadlineCommitment(registry, duration, delay);
+        assert(result.registryRoundTime > result.commitmentBoundary);
+        assert(result.drandRound == uint64(result.commitmentBoundary + 1));
+        assert(result.targetAfterCalls == result.drandRound);
+        assert(uint8(result.status) == uint8(RoundStatus.Open));
+    }
+
+    function check_deadlineRejectsPurchasesAtOrAfterClose(uint256 rawElapsed) public {
+        uint256 elapsed = bound(rawElapsed, 0, type(uint32).max);
+        LotteryDeadlineCommitmentHarness lottery = new LotteryDeadlineCommitmentHarness();
+        FormalToken token = new FormalToken("PURCHASE");
+        lottery.seedPurchaseBoundary(1, 100, token);
+        token.mint(address(this), 20);
+        token.approve(address(lottery), 20);
+        vm.warp(99);
+        lottery.buyTickets(1, 1);
+        vm.warp(100 + elapsed);
+        (bool success, bytes memory reason) =
+            address(lottery).call(abi.encodeCall(lottery.buyTickets, (1, 1)));
+        assert(
+            keccak256(reason) == keccak256(abi.encodeWithSelector(Errors.RoundExpired.selector, 1))
+        );
+        assert(!success);
+        (uint32 sold, uint256 receipts) = lottery.purchaseState(1);
+        assert(sold == 2 && receipts == 20);
+        assert(token.balanceOf(address(lottery)) == 10);
+        assert(token.balanceOf(address(this)) == 10);
+    }
+
+    function check_deadlineRejectsPrematureSettlement(uint256 rawSold) public {
+        vm.assume(rawSold > 0 && rawSold < type(uint32).max);
+        uint32 sold = uint32(rawSold);
+        LotteryDeadlineSettlementHarness lottery = new LotteryDeadlineSettlementHarness();
+        FormalRegistry registry = new FormalRegistry(true);
+        lottery.seedDeadlineRound(1, 1, address(0), registry, sold);
+        vm.warp(0);
+        (bool success, bytes memory reason) =
+            address(lottery).call(abi.encodeCall(lottery.settleRound, (1, bytes(""))));
+        assert(!success);
+        assert(
+            keccak256(reason) == keccak256(abi.encodeWithSelector(Errors.RoundNotReady.selector, 1))
+        );
+        (Round memory round, AssetAccounting memory a) = lottery.observe(1, address(0));
+        assert(uint8(round.status) == uint8(RoundStatus.Open));
+        assert(a.activeRoundEscrow == sold);
+    }
+
+    function check_deadlineWinnerIsSoldAndRevenueConserved(uint256 rawSold) public {
+        vm.assume(rawSold > 0 && rawSold < type(uint32).max);
+        uint32 sold = uint32(rawSold);
+        LotteryDeadlineSettlementHarness lottery = new LotteryDeadlineSettlementHarness();
+        FormalRegistry registry = new FormalRegistry(true);
+        lottery.seedDeadlineRound(1, 1, address(0), registry, sold);
+        vm.warp(2);
+        (uint32 ticket, address winner) = lottery.settleRound(1, "");
+        assert(ticket < sold);
+        assert(winner == address(this));
+        (Round memory round, AssetAccounting memory a) = lottery.observe(1, address(0));
+        assert(uint8(round.status) == uint8(RoundStatus.Settled));
+        assert(round.drandRound == 2 && round.selloutAt == 0);
+        assert(a.activeRoundEscrow == 0 && a.refundLiability == 0);
+        assert(
+            a.winnerLiability + a.pendingOperatorRevenueTotal + a.treasuryAvailable
+                    + a.finalizerLiability == sold
+        );
+        (bool success,) = address(lottery).call(abi.encodeCall(lottery.settleRound, (1, bytes(""))));
+        assert(!success);
     }
 }
 
@@ -157,17 +239,6 @@ contract LotteryClaimsHalmosTest is Test {
         LotteryClaimsHarness claims = new LotteryClaimsHarness();
 
         ClaimObservation memory observed = claims.executeWinnerClaim(facet, token, amount, RECEIVER);
-
-        _assertClaimCleared(observed, amount);
-    }
-
-    function check_refundClaimCannotRepeat(uint256 rawAmount) public {
-        uint96 amount = uint96(bound(rawAmount, 1, type(uint96).max));
-        FormalToken token = new FormalToken("REFUND");
-        ClaimsFacet facet = new ClaimsFacet();
-        LotteryClaimsHarness claims = new LotteryClaimsHarness();
-
-        ClaimObservation memory observed = claims.executeRefundClaim(facet, token, amount, RECEIVER);
 
         _assertClaimCleared(observed, amount);
     }

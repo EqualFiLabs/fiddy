@@ -37,6 +37,9 @@ jobs:
       - name: Run lint
         run: forge lint
 
+      - name: Test lifecycle validator mode selection
+        run: bash script/test-validate-robinhood-testnet-lifecycle.sh
+
       - name: Run full test and fuzz suite
         env:
           FOUNDRY_PROFILE: ci

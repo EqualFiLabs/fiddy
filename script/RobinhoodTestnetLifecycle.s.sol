@@ -33,7 +33,8 @@ interface ITestnetRouterAdmin {
 abstract contract RobinhoodTestnetLifecycleScript is Script {
     uint256 internal constant ROBINHOOD_TESTNET_CHAIN_ID = 46_630;
     address internal constant EXPECTED_DEPLOYER = 0x6Ae2aD9905FEDC8270b828294D4b9CEC7CBBE316;
-    address internal constant DIAMOND = 0x89373b3946818811d9421a48410a6164D4608680;
+    // Required fresh deployment; never default to the finalized historical rehearsal Diamond.
+    address internal immutable DIAMOND = vm.envAddress("LOTTERY_DIAMOND");
     address internal constant ROUTER = 0xE7Bb1D2766377984546611291732cED1833C0c36;
     address internal constant ROUTER_ADMIN = 0x79c89f35d60fC2C0aEC9F5bB6D0B34d4c4B6dB87;
     address internal constant WETH = 0x33e4191705c386532ba27cBF171Db86919200B94;
@@ -129,7 +130,7 @@ contract SettleWethTestnetRound is RobinhoodTestnetLifecycleScript {
     }
 }
 
-contract ExpireAndRefundTestnetRound is RobinhoodTestnetLifecycleScript {
+contract SettleDeadlineTestnetRound is RobinhoodTestnetLifecycleScript {
     function run() external {
         uint256 key = _deployerKey();
         uint256 roundId = vm.envUint("LOTTERY_ROUND_ID");
@@ -138,16 +139,27 @@ contract ExpireAndRefundTestnetRound is RobinhoodTestnetLifecycleScript {
         _assert(beforeRound.status == RoundStatus.Open, "Round not open");
         // forge-lint: disable-next-line(block-timestamp)
         _assert(block.timestamp >= beforeRound.expiresAt, "Round not expired by time");
-        uint256 expectedRefund = beforeRound.receipts;
-
+        bytes memory signature = vm.envBytes("QUICKNET_SIGNATURE");
+        address asset = beforeRound.config.paymentToken;
         vm.startBroadcast(key);
-        ILottery(DIAMOND).expireRound(roundId);
-        IClaims(DIAMOND).claimRefund(roundId, EXPECTED_DEPLOYER);
+        ISettlement(DIAMOND).settleRound(roundId, signature);
+        IClaims(DIAMOND).claimWinner(roundId, EXPECTED_DEPLOYER);
+        uint256 tips = stateView.finalizerCredit(asset, EXPECTED_DEPLOYER);
+        if (tips != 0) IClaims(DIAMOND).claimFinalizerTips(asset, EXPECTED_DEPLOYER);
+        uint256 operators = stateView.pendingOperatorRevenue(beforeRound.integrationVersion, asset);
+        if (operators != 0) {
+            IRevenue(DIAMOND).flushOperatorRevenue(beforeRound.integrationVersion, asset, operators);
+        }
+        uint256 treasuryAmount = stateView.assetAccounting(asset).treasuryAvailable;
+        if (treasuryAmount != 0) IRevenue(DIAMOND).flushTreasury(asset, treasuryAmount);
         vm.stopBroadcast();
-
-        _assert(stateView.round(roundId).status == RoundStatus.Expired, "Round not expired");
-        _assert(stateView.refundableAmount(roundId, EXPECTED_DEPLOYER) == 0, "refund remains");
-        _assert(expectedRefund != 0, "refund must be nonzero");
+        Round memory settled = stateView.round(roundId);
+        _assert(settled.status == RoundStatus.Settled, "Round not settled");
+        _assert(settled.selloutAt == 0, "must exercise deadline draw");
+        _assert(settled.drandRound == beforeRound.drandRound, "deadline target changed");
+        _assert(settled.winningTicket < beforeRound.soldTickets, "unsold ticket won");
+        _assert(settled.winnerClaimable == 0, "winner claim remains");
+        _assert(stateView.assetAccounting(asset).refundLiability == 0, "refund liability created");
     }
 }
 

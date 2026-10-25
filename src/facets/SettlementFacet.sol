@@ -37,12 +37,15 @@ contract SettlementFacet is ISettlement {
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
         Round storage round = gs.rounds[roundId];
         if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
-        if (round.status != RoundStatus.SoldOut || round.drandRound == 0) {
-            revert Errors.RoundNotSoldOut(roundId);
+        bool soldOut = round.status == RoundStatus.SoldOut;
+        bool deadlineReached =
+            round.status == RoundStatus.Open && block.timestamp >= round.expiresAt;
+        if ((!soldOut && !deadlineReached) || round.drandRound == 0 || round.soldTickets == 0) {
+            revert Errors.RoundNotReady(roundId);
         }
 
         bytes32 applicationSeed = _acquireApplicationSeed(round, roundId, quicknetSignature);
-        winningTicket = (uint256(applicationSeed) % round.config.ticketCount).toUint32();
+        winningTicket = (uint256(applicationSeed) % round.soldTickets).toUint32();
         winner = LibTicketRanges.ownerOfTicket(gs.entries[roundId], winningTicket);
         SettlementAmounts memory amounts = _allocate(round);
 
@@ -72,16 +75,17 @@ contract SettlementFacet is ISettlement {
         IEqualFiDrandRegistry registry = IEqualFiDrandRegistry(integration.drandRegistry);
         uint64 drandRound = round.drandRound;
         if (!registry.hasSig(drandRound)) {
-            bool newlyStored = registry.postSig(drandRound, quicknetSignature);
-            if (!newlyStored && !registry.hasSig(drandRound)) {
+            registry.postSig(drandRound, quicknetSignature);
+            if (!registry.hasSig(drandRound)) {
                 revert Errors.RandomnessUnavailable(drandRound);
             }
         }
-        if (!registry.hasSig(drandRound)) revert Errors.RandomnessUnavailable(drandRound);
 
         uint64 postedAt = registry.postedAt(drandRound);
-        if (postedAt <= round.selloutAt) {
-            revert Errors.RandomnessPredatesSellout(drandRound, postedAt, round.selloutAt);
+        uint64 salesCloseAt =
+            round.status == RoundStatus.SoldOut ? round.selloutAt : round.expiresAt;
+        if (postedAt <= salesCloseAt) {
+            revert Errors.RandomnessPredatesClose(drandRound, postedAt, salesCloseAt);
         }
 
         return keccak256(

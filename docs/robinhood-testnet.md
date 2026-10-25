@@ -71,3 +71,11 @@ reconciles the later lifecycle manifest. The Router repository separately valida
 bootstrap and deployment receipt history. Explorer source verification was intentionally waived
 for these throwaway deployments; runtime hashes and exact source/toolchain pins are the evidence
 boundary.
+
+## Fresh deadline-draw rehearsal (pending)
+
+The historical Diamond was finalized; do not point new scripts at it. The revised lifecycle script requires `LOTTERY_DIAMOND` for an explicitly verified fresh deployment. Existing token, Registry, and Router addresses must be revalidated before any authorized broadcast. Deployment remains guarded to chain 46630 and the dedicated testnet signer. No new transaction is authorized or claimed by the deadline-draw PR.
+
+Run `PrepareConcurrentTestnetRounds` against the fresh Diamond, settle its sold-out WETH Round through `SettleWethTestnetRound`, and settle the unsold STATICS Round through `SettleDeadlineTestnetRound` after its recorded deadline beacon is available. Supply that exact beacon's `QUICKNET_SIGNATURE` and `LOTTERY_ROUND_ID`. Continue the sold-out STATICS and upgrade/finalization steps, then use the deadline script again for the post-finalization partial Round. The finalizer must be the sole buyer in these rehearsal scripts so winner claims can be exercised by the dedicated signer.
+
+Keep the two-minute rehearsal configuration for practical execution; this is not a production-duration default. Record new receipts, opening/sellout scheduling logs, actual receipts, sold-ticket outcomes, claim balances, and runtime hashes in new manifests, preserving the historical files. Validators accept an explicit manifest path. The lifecycle validator permits an omitted `lifecycleModel` only for the pinned historical `deployments/robinhood-testnet/lifecycle.json`; other historical manifests must explicitly select `legacy`. Missing, unknown, or invalid models fail before any RPC call. For a new lifecycle manifest set `lifecycleModel` to `deadline-draws`, include `deadlineDrawRoundIds`, and include a Quicknet record for every exercised draw. The validator checks opening-schedule logs, cutoff arithmetic, sold-ticket selection, and claim/accounting reconciliation.

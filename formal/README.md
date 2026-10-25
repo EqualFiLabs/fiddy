@@ -15,12 +15,24 @@ operator tooling. Do not install, probe, or invoke Halmos on an ordinary develop
 - `check_settlementDoesNotMutateIsolatedToken`
 - `check_settlementRecordsTerminalStatus`
 - `check_winnerClaimCannotRepeat`
-- `check_refundClaimCannotRepeat`
 - `check_operatorFlushIsAtomicAndTokenIsolated`
 - `check_cutFinalizationCannotBeReversed`
 
 Every required rule must complete without a counterexample, timeout, unknown result, panic, or
-bounded-loop warning. A compiled harness is not a proof result.
+bounded-loop warning. A compiled harness is not a proof result. Branch-feasibility pruning has a 1 ms solver budget: an unresolved branch is explored rather than discarded. Assertion solving has no timeout; all panic codes remain failures. An outer execution timeout is an incomplete run, never a pass.
+
+- `check_deadlineCommitmentIsFutureAndFixed`
+- `check_deadlineRejectsPurchasesAtOrAfterClose`
+- `check_deadlineRejectsPrematureSettlement`
+- `check_deadlineWinnerIsSoldAndRevenueConserved`
+
+## Deadline model
+
+The deadline commitment property calls the shared production scheduling helper for positive `uint32` durations and all `uint32` delays, using the deterministic Registry schedule summary. The purchase property funds and approves an exact-transfer token, executes a successful production `buyTickets` call immediately before a fixed deadline, then requires the exact `RoundExpired` error at/after it with unchanged ticket, receipt, and token balances. Its seeded initial sold/receipt history is synthetic; it proves the purchase guard, not whole-round solvency. The settlement properties call production `settleRound`, including its readiness gate, seed derivation, sold-ticket lookup, allocation, and accounting. A single cumulative ownership range contains every positive sold quantity below `uint32.max` (constrained directly with `vm.assume`, without a modulo-based input remap); the configured cap is one larger. The Registry summary supplies one canonical cached beacon after the cutoff. Token custody is abstracted for this accounting-only path. These harnesses seed reachable preconditions rather than proving the opening/purchase history; Diamond integration tests cover that history.
+
+Harness seed/read helpers accept mapping keys as runtime parameters so the prover uses the same runtime Keccak storage representation as the production paths; hard-coded precomputed mapping hashes are not interchangeable in Halmos 0.3.3. Concrete controls in `test/LotteryFormalSanity.t.sol` also execute the purchase and settlement properties in Foundry.
+
+The removed refund-claim rule belongs to the retired API; historical reports retain that result for the original release. Current rounds have no refund transition, checked by deadline settlement assertions and stateful invariants. All remaining original properties must still pass. The original evidence files bind their original source; new candidate evidence is separate.
 
 ## Model bounds
 
@@ -51,7 +63,7 @@ aggregate/versioned Operator equality, and no mutation of the unrelated token's 
 accounting. It does not prove Registry acquisition, ticket-owner lookup, or the external
 `settleRound` state gate; concrete integration tests cover those paths.
 
-The claim rules call the production `ClaimsFacet` for every nonzero `uint96` winner or refund
+The claim rules call the production `ClaimsFacet` for every nonzero `uint96` winner
 amount using an exact-transfer ERC-20. They prove one successful delivery clears the matching
 claim and aggregate liability, transfers the exact amount, and makes an identical second claim
 fail without additional delivery.

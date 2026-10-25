@@ -1,9 +1,11 @@
 # Operator Fee Router Integration
 
-Statics Lottery targets the public `EqualFiLabs/operator-fee-router` interface accepted in merged
-PR #2. The reviewed merge commit is `f98a17780cb250ce28f446ab54eb078512fb2e0b`; its implementation
-parent is `b8faeb839a2e9981b6d6f4fee46b07608481ec64`. That implementation verifies both contributor spend
-and Router receipt during `addRewards`.
+Statics Lottery pins the public `EqualFiLabs/operator-fee-router` implementation at
+[`a6afe541c6261f1febb2eaf0f4d68ef5aa16548e`](https://github.com/EqualFiLabs/operator-fee-router/commit/a6afe541c6261f1febb2eaf0f4d68ef5aa16548e),
+accepted in merged PR #1. Its contracts, tests, compiler configuration, and dependency pins are
+identical to the originally reviewed `f98a17780cb250ce28f446ab54eb078512fb2e0b` snapshot; only two
+README lines differ. The reachable pin restores clean checkout without changing Router behavior.
+The implementation verifies both contributor spend and Router receipt during `addRewards`.
 
 No deployment address is hard-coded in the Lottery. Each immutable Lottery integration version
 pins one Router address, and each deployment manifest must identify that address, chain, runtime

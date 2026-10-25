@@ -6,7 +6,7 @@ set -euo pipefail
 cast_bin=${CAST_BIN:-cast}
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "$script_dir/.." && pwd)
-manifest="$repo_root/deployments/robinhood-testnet/lottery.json"
+manifest="${1:-$repo_root/deployments/robinhood-testnet/lottery.json}"
 
 assert_equal() {
     local actual=$1

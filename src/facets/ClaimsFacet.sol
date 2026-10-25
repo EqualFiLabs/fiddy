@@ -38,29 +38,6 @@ contract ClaimsFacet is IClaims {
         emit WinnerClaimed(roundId, msg.sender, receiver, paymentToken, amount);
     }
 
-    function claimRefund(uint256 roundId, address receiver)
-        external
-        nonReentrant
-        returns (uint256 amount)
-    {
-        _validateReceiver(receiver);
-        LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
-        Round storage round = gs.rounds[roundId];
-        if (round.status == RoundStatus.None) revert Errors.RoundNotFound(roundId);
-        if (round.status != RoundStatus.Expired) revert Errors.RoundNotExpired(roundId);
-
-        amount = gs.refundCredit[roundId][msg.sender];
-        if (amount == 0) revert Errors.NoRefund();
-        gs.refundCredit[roundId][msg.sender] = 0;
-
-        address paymentToken = round.config.paymentToken;
-        LibLotteryStorage.accountingStorage()
-                .assetAccounting[paymentToken]
-                .refundLiability -= amount;
-        LibExactToken.pushExact(paymentToken, receiver, amount);
-        emit RefundClaimed(roundId, msg.sender, receiver, paymentToken, amount);
-    }
-
     function claimFinalizerTips(address asset, address receiver)
         external
         nonReentrant

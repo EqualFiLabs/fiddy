@@ -1,6 +1,6 @@
 # Randomness and Verification Boundary
 
-Every sold-out Statics Lottery Round uses exactly one drand Quicknet beacon verified by the
+Every Statics Lottery Round uses exactly one drand Quicknet beacon verified by the
 external immutable `EqualFiDrandRegistry`. There is no Lottery-local BLS implementation and no
 fallback randomness.
 
@@ -12,35 +12,26 @@ The release-critical Registry claim is:
 > `EqualFiDrandRegistry` corresponds to a valid Quicknet signature for exactly that Round,
 > produces one canonical Round-bound randomness value, and can never be replaced.
 
-The Lottery formal package proves a different and narrower connection: once a Round sells out,
-the production commitment routine stores the Registry-selected target strictly after the supplied
-L2 timestamp boundary, later configuration-catalog changes do not alter it, and settlement/accounting
-uses the resulting immutable Round state. It does not re-prove Registry cryptography.
+The Lottery formal package checks a narrower application boundary: production helpers schedule the Registry-selected target strictly after the opening deadline or early-sellout boundary, and later configuration-catalog changes do not alter it. Deadline rules exercise the purchase cutoff, settlement readiness, sold-ticket winner selection, and actual-receipt accounting under documented synthetic preconditions. See the candidate-specific report in `formal/reports/` for completed results and bounds. These rules do not re-prove Registry cryptography.
 
-## Sellout commitment
+## Deadline and sellout schedules
 
-The last ticket purchase and commitment occur atomically. For the Round's snapshotted values:
+At opening, use the snapshotted Registry and delay:
 
 ```text
-commitmentBoundary = block.timestamp + randomnessDelay
-target = snapshottedRegistry.firstRoundAfter(commitmentBoundary)
-
-require(target != 0)
-require(snapshottedRegistry.roundTime(target) > commitmentBoundary)
-require(!snapshottedRegistry.hasSig(target))
-
-round.selloutAt = block.timestamp
+boundary = expiresAt + randomnessDelay
+target = registry.firstRoundAfter(boundary)
+require(target != 0 && registry.roundTime(target) > boundary)
+require(!registry.hasSig(target))
 round.drandRound = target
-round.status = SoldOut
+emit RoundDrawScheduled(roundId, expiresAt, target)
 ```
 
-The target is written once. Governance cannot move a sold-out Round to a different Registry,
-Quicknet Round, or configuration. If that exact beacon is delayed, the Round waits.
+If a final purchase sells out before `expiresAt`, the same transaction records `selloutAt`, marks `SoldOut`, and deterministically replaces that deadline schedule using the identical validation with `boundary = selloutAt + randomnessDelay`. It emits a new schedule and `RoundSoldOut`. The target can be equal to the deadline target when scheduling intervals coincide; it cannot be caller-selected.
 
-The cache-absence check proves only that the Registry has not already stored the signature on that
-chain. Under the accepted sequencer-honesty assumption, the strict scheduled-time check means the
-beacon is not yet available when sellout is ordered. Neither check proves that public drand data is
-unknown offchain if a malicious sequencer withholds inclusion or keeps L2 time stale.
+This is the sole schedule replacement. At or after the applicable sales cutoff, the target is fixed. Unsold deadline settlement never computes a new target from `block.timestamp`; a late finalizer uses the original deadline target, including a previously cached beacon. Neither pausing nor configuration changes alter the schedule.
+
+Sales stop before the beacon is scheduled. These are L2 timestamp/order guarantees under the accepted honest-sequencer assumption. Cache absence proves only absence in the Registry, not offchain freshness against a malicious sequencer.
 
 ## Proof transports and normalization
 
@@ -66,7 +57,7 @@ A finalizer may provide proof bytes only when the committed Round is not already
 then requires:
 
 1. `hasSig(round.drandRound) == true`;
-2. `postedAt(round.drandRound) > round.selloutAt`; and
+2. `postedAt(round.drandRound) > salesCloseAt`, where `salesCloseAt` is `selloutAt` for sold-out Rounds and `expiresAt` for unsold Rounds; and
 3. randomness read from that exact Round.
 
 The Lottery seed is:
@@ -81,7 +72,7 @@ applicationSeed = keccak256(
     )
 )
 
-winningTicket = uint256(applicationSeed) % ticketCount
+winningTicket = uint256(applicationSeed) % soldTickets
 ```
 
 Chain ID, Diamond address, and Round ID prevent the same Registry value from producing a shared
@@ -91,7 +82,7 @@ Round's immutable cumulative ticket ranges.
 ## No fallback
 
 Production code has no `blockhash`, `prevrandao`, sequencer random value, administrator entropy,
-VRF, CCIP, alternate Registry, later-beacon substitution, or local pseudo-random path. A sold-out
+VRF, CCIP, alternate Registry, later-beacon substitution, or local pseudo-random path. A closed
 Round either settles from its committed Quicknet Round or remains pending.
 
 This choice makes the failure mode visible and non-selective. Adding any alternate entropy source
@@ -116,7 +107,9 @@ signature point, mapped message point, compiled Quicknet DST, compiled public ke
 pairing transcript. `accepted` represents the pairing relation for that specific transcript; it is
 not an unconstrained oracle and cannot authorize another proof or Round.
 
-## Pinned formal artifacts
+## Historical pinned formal artifacts
+
+The following Lottery report binds the original sellout/refund release, not the deadline-draw implementation. The unchanged Registry package retains its separate source/runtime boundary. Updated Lottery evidence is recorded in a separate candidate report.
 
 ### Registry
 

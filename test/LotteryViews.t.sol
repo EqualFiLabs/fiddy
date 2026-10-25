@@ -98,8 +98,6 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         assertEq(stateView.ticketOwner(roundId, 3), alice);
         assertEq(stateView.ticketOwner(roundId, 4), bob);
         assertEq(stateView.ticketOwner(roundId, 6), bob);
-        assertEq(stateView.refundableAmount(roundId, alice), 40);
-        assertEq(stateView.refundableAmount(roundId, bob), 30);
     }
 
     function test_RejectsUnknownRoundsAndInvalidTicketEntries() public {
@@ -112,9 +110,6 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotFound.selector, 1));
         stateView.purchaseEntryCount(1);
 
-        vm.expectRevert(abi.encodeWithSelector(Errors.RoundNotFound.selector, 1));
-        stateView.refundableAmount(1, alice);
-
         vm.prank(alice);
         uint256 roundId = lottery.openRound(1, 1);
 
@@ -125,7 +120,7 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         stateView.ticketOwner(roundId, 1);
     }
 
-    function test_ExposesTokenScopedSettlementAndRefundAccounting() public {
+    function test_ExposesTokenScopedSelloutAndDeadlineAccounting() public {
         uint256 settledRoundId = _sellOutRoundA();
         bytes memory proof = hex"a1b2c3";
         _prepareProof(settledRoundId, proof);
@@ -133,17 +128,17 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
         settlement.settleRound(settledRoundId, proof);
 
         vm.prank(alice);
-        uint256 expiredRoundId = lottery.openRound(2, 2);
-        vm.warp(stateView.round(expiredRoundId).expiresAt);
-        lottery.expireRound(expiredRoundId);
+        uint256 deadlineRoundId = lottery.openRound(2, 2);
+        vm.warp(stateView.round(deadlineRoundId).expiresAt);
+        _prepareProof(deadlineRoundId, hex"abcd");
+        settlement.settleRound(deadlineRoundId, hex"abcd");
 
         Round memory settled = stateView.round(settledRoundId);
-        Round memory expired = stateView.round(expiredRoundId);
+        Round memory deadline = stateView.round(deadlineRoundId);
         assertEq(uint8(settled.status), uint8(RoundStatus.Settled));
         assertEq(settled.winnerClaimable, 80);
         assertEq(stateView.activeRoundForConfig(1), 0);
-        assertEq(uint8(expired.status), uint8(RoundStatus.Expired));
-        assertEq(stateView.refundableAmount(expiredRoundId, alice), 40);
+        assertEq(uint8(deadline.status), uint8(RoundStatus.Settled));
         assertEq(stateView.activeRoundForConfig(2), 0);
 
         AssetAccounting memory accountingA = stateView.assetAccounting(address(tokenA));
@@ -158,10 +153,10 @@ contract LotteryViewsTest is LotteryIntegrationSetup {
 
         AssetAccounting memory accountingB = stateView.assetAccounting(address(tokenB));
         assertEq(accountingB.activeRoundEscrow, 0);
-        assertEq(accountingB.winnerLiability, 0);
-        assertEq(accountingB.refundLiability, 40);
-        assertEq(accountingB.finalizerLiability, 0);
-        assertEq(accountingB.pendingOperatorRevenueTotal, 0);
-        assertEq(accountingB.treasuryAvailable, 0);
+        assertEq(accountingB.winnerLiability, 32);
+        assertEq(accountingB.refundLiability, 0);
+        assertEq(accountingB.finalizerLiability, 3);
+        assertEq(accountingB.pendingOperatorRevenueTotal, 4);
+        assertEq(accountingB.treasuryAvailable, 1);
     }
 }

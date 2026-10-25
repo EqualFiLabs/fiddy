@@ -59,11 +59,6 @@ contract LotteryViewFacet is ILotteryView {
         return entries[index];
     }
 
-    function refundableAmount(uint256 roundId, address account) external view returns (uint256) {
-        _round(roundId);
-        return LibLotteryStorage.gameStorage().refundCredit[roundId][account];
-    }
-
     function lotteryConfig(uint64 version)
         external
         view

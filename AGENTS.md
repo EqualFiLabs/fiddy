@@ -60,8 +60,11 @@
   reject fee-on-transfer, sender-fee, rebasing, or otherwise inexact behavior.
 - A sold-out round is final: it cannot be cancelled or refunded. It proceeds to
   the configured drand round and settlement.
-- An expired unsold round refunds all ticket principal. No fee or revenue share
-  is earned from a failed round.
+- An unsold round draws among purchased tickets after its configured sales deadline.
+  Allocate actual receipts; never create new refund liabilities or purchase refund credits.
+- Sales duration remains configurable, including week-long rounds; do not impose a 24-hour cap.
+- At opening schedule the first beacon strictly after deadline plus delay. Only an
+  atomic early sellout may supersede that schedule with its deterministic future beacon.
 - There is no fallback randomness. A sold-out round waits for the committed
   drand round and must not switch providers, use a later round, or derive local
   entropy.
@@ -72,7 +75,7 @@
 - Claims and revenue delivery are pull-based and independently retryable. A
   failed recipient or Router interaction must not reverse settlement or block
   unrelated claims.
-- Pausing may stop new exposure, but must not prevent refunds, winner claims,
+- Pausing may stop new exposure, but must not prevent deadline draws, winner claims,
   Treasury claims, Operator funding retries, or other liability-reducing exits.
 - Forward the Operator share in the same Payment Token directly to the
   configured `OperatorFeeRouter`. Do not silently swap tokens, wrap native ETH,
@@ -138,7 +141,7 @@
 - Cover each value-moving lifecycle with real ERC-20 approvals, transfers,
   balance changes, claims, and exact-delta assertions.
 - Test concurrent rounds with different Payment Tokens and prove that settlement,
-  refunds, fees, and excess-balance handling remain isolated by token and round.
+  deadline draws, fees, and excess-balance handling remain isolated by token and round.
 - Include adversarial token tests for receiver fees, sender fees, rebasing or
   balance drift, unusual return values, and reentrant callbacks where applicable.
 - Use the real `OperatorFeeRouter` and `EqualFiDrandRegistry` interfaces in
@@ -146,7 +149,7 @@
   establish compatibility with live deployments.
 - Final testnet validation must use an actual committed drand Quicknet round and
   exercise delayed settlement, winner claims, Treasury claims, Operator Router
-  funding, and unsold-round refunds.
+  funding, and unsold deadline draws.
 - Fuzz and invariant tests broaden state-space coverage; they supplement rather
   than replace real lifecycle tests.
 - Synthetic balance injection, direct storage mutation, and shortcut minting

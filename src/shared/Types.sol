@@ -23,7 +23,7 @@ enum RoundStatus {
     Open,
     SoldOut,
     Settled,
-    Expired
+    Expired // Reserved legacy ordinal; new rounds never expire into refunds.
 }
 
 struct RoundConfigSnapshot {
@@ -64,7 +64,7 @@ struct TicketRange {
 struct AssetAccounting {
     uint256 activeRoundEscrow;
     uint256 winnerLiability;
-    uint256 refundLiability;
+    uint256 refundLiability; // Reserved legacy storage slot; always zero for new rounds.
     uint256 finalizerLiability;
     uint256 pendingOperatorRevenueTotal;
     uint256 treasuryAvailable;

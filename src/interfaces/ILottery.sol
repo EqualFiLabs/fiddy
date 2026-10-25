@@ -20,13 +20,10 @@ interface ILottery {
         uint256 amount
     );
     event RoundSoldOut(uint256 indexed roundId, uint64 selloutAt, uint64 drandRound);
-    event RoundExpired(
-        uint256 indexed roundId, address indexed paymentToken, uint256 refundLiability
-    );
+    event RoundDrawScheduled(uint256 indexed roundId, uint64 salesCloseAt, uint64 drandRound);
 
     function openRound(uint64 configVersion, uint32 ticketQuantity)
         external
         returns (uint256 roundId);
     function buyTickets(uint256 roundId, uint32 ticketQuantity) external;
-    function expireRound(uint256 roundId) external;
 }

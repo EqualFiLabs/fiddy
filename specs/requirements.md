@@ -2,7 +2,7 @@
 
 ## Introduction
 
-Statics Lottery is a standalone, sellout-based onchain lottery that accepts a governance-approved ERC-20 payment token configured per Round, commits each sold-out round to a drand Quicknet round scheduled strictly after its L2 commitment boundary, and permits anyone to finalize the result once the committed beacon is available.
+Statics Lottery is a standalone, sellout-or-deadline onchain lottery that accepts a governance-approved ERC-20 payment token configured per Round, schedules each Round at opening for a drand Quicknet beacon strictly after its sales deadline plus delay, replacing that schedule only on atomic early Sellout with a beacon strictly after sellout plus delay, and permits anyone to finalize the result once the committed beacon is available.
 
 Each Round distributes its payment-token revenue among the winning ticket holder, the Statics Treasury, and Statics Operators. Operator revenue is contributed directly to the standalone `OperatorFeeRouter` in the same ERC-20 token used to purchase that Round's tickets.
 
@@ -46,7 +46,7 @@ An immutable governance-created Round Configuration that may be enabled or disab
 
 **Payment Token**
 
-The governance-approved ERC-20 token in which a Round's ticket price, receipts, liabilities, revenue, claims, and refunds are denominated.
+The governance-approved ERC-20 token in which a Round's ticket price, receipts, liabilities, revenue, and claims are denominated.
 
 **Configuration Snapshot**
 
@@ -74,7 +74,7 @@ A configurable incentive denominated in the Round's Payment Token and credited f
 
 **Expiration**
 
-The condition reached when an unsold Round exceeds its configured sales duration.
+The sales cutoff reached when an unsold Round reaches its configured sales duration. This enables a deadline draw, not a refund.
 
 **EqualFiDrandRegistry**
 
@@ -82,7 +82,7 @@ The standalone shared EqualFi infrastructure contract responsible for verifying 
 
 **Quicknet Round**
 
-A specific drand Quicknet beacon round selected as the randomness source for a sold-out lottery Round.
+A specific drand Quicknet beacon round selected as the randomness source for a lottery Round, scheduled at opening and deterministically rescheduled on early Sellout.
 
 **OperatorFeeRouter**
 
@@ -94,7 +94,7 @@ Operator revenue, denominated and held in a Round's Payment Token, that has been
 
 **Terminal State**
 
-A Round state from which ticket purchases can never resume, including settlement or expiration.
+A settled Round state from which ticket purchases can never resume. The legacy expired enum value is reserved and unreachable for new Rounds.
 
 ---
 
@@ -114,7 +114,7 @@ A Round state from which ticket purchases can never resume, including settlement
    - Round sales duration or expiration period;
    - Winner Share;
    - Operator/Treasury allocation of the Protocol Share;
-   - randomness delay following Sellout;
+   - randomness delay following the sales cutoff (Sellout or deadline);
    - Finalizer Tip;
    - any per-purchase ticket limit;
    - the global active-Round concurrency limit.
@@ -148,7 +148,7 @@ A Round state from which ticket purchases can never resume, including settlement
 2. AFTER a Round is opened, THE Configuration Snapshot SHALL NOT be modified.
 3. WHEN the configuration catalog, enabled states, global opening policy, or current integration changes, THE change SHALL NOT alter any already-open Round.
 4. Settlement SHALL use only the Round's Configuration Snapshot.
-5. Refund eligibility SHALL use only the Round's Configuration Snapshot.
+5. Deadline-draw eligibility SHALL use only the Round's Configuration Snapshot.
 6. Winner, Operator, Treasury, and Finalizer allocations SHALL use only the Round's Configuration Snapshot.
 
 ### Requirement 4: Permissionless Round Opening
@@ -196,20 +196,18 @@ A Round state from which ticket purchases can never resume, including settlement
 4. Winner lookup SHALL NOT require iterating across every ticket in the Round.
 5. THE owner resolved for a winning ticket SHALL be the address to which that ticket was attributed at purchase.
 
-### Requirement 7: Sellout Commitment to a Later Quicknet Round
+### Requirement 7: Deterministic Sellout and Deadline Commitments
 
-**User Story:** As a ticket buyer, I want the Round committed to a Quicknet beacon scheduled strictly after the L2 sellout boundary, so that under the honest-sequencer assumption no public participant can purchase after knowing or selecting the winning randomness.
+**User Story:** As a buyer, I want sales to close before the selected beacon becomes public, with no choice of beacon for a late finalizer.
 
 #### Acceptance Criteria
 
-1. WHEN the final available ticket is purchased, THE Round SHALL become sold out atomically with that purchase.
-2. AT Sellout, THE Lottery SHALL permanently determine the specific Quicknet Round scheduled strictly after the Round's L2 commitment boundary that will settle the lottery Round.
-3. THE selected Quicknet Round SHALL be determined using the Round's snapshotted randomness delay and the canonical round-selection functionality exposed by `EqualFiDrandRegistry`.
-4. THE selected Quicknet Round SHALL correspond to randomness scheduled strictly after the applicable commitment boundary.
-5. AT Sellout, THE Lottery SHALL reject a randomness target already cached by the Registry, and settlement SHALL reject a target whose Registry posting time does not follow Sellout.
-6. AFTER Sellout, THE selected Quicknet Round SHALL NOT be replaceable by governance, a guardian, the finalizer, or any other account.
-7. AFTER Sellout, THE Lottery SHALL NOT accept additional ticket purchases.
-8. Freshness of the L2 commitment boundary SHALL rely on the documented Robinhood-operated-sequencer honesty assumption; V1 SHALL NOT claim outcome fairness against a sequencer that deliberately manipulates transaction inclusion, ordering, or permitted L2 timestamp progression.
+1. AT opening, THE Lottery SHALL store the Registry-selected first Quicknet Round strictly after `expiresAt + randomnessDelay`, rejecting zero, incorrectly scheduled, or already cached targets.
+2. WHILE sales remain open, purchases SHALL NOT change that deadline target unless the purchase atomically sells out the Round before its deadline.
+3. AT early Sellout, THE Lottery SHALL replace the deadline schedule deterministically with the first beacon strictly after `selloutAt + randomnessDelay`, rejecting invalid or cached targets atomically with the final purchase.
+4. AFTER Sellout or the sales deadline, THE target SHALL NOT be replaceable by buyers, governance configuration, finalizers, or any other ordinary call.
+5. THE Registry and delay SHALL come from the Round's immutable snapshots; later catalog changes SHALL NOT affect the Round.
+6. THE freshness interpretation SHALL retain the documented honest-sequencer assumption; cache absence does not establish offchain freshness against a malicious sequencer.
 
 ### Requirement 8: Shared drand Quicknet Randomness
 
@@ -222,7 +220,7 @@ A Round state from which ticket purchases can never resume, including settlement
 3. THE Lottery SHALL accept a Round as settleable only when the exact committed Quicknet Round has been successfully verified by the Registry.
 4. IF the committed Quicknet Round is already cached by the Registry, THE Lottery SHALL be able to reuse it without requiring another BLS verification.
 5. IF the committed Quicknet Round has not yet been cached, THE settlement path SHALL permit the caller to provide the proof necessary for the Registry to verify and cache it.
-6. THE Lottery SHALL NOT use `blockhash`, `prevrandao`, a sequencer-provided random value, administrator-supplied entropy, or another fallback randomness source to settle a sold-out Round.
+6. THE Lottery SHALL NOT use `blockhash`, `prevrandao`, a sequencer-provided random value, administrator-supplied entropy, or another fallback randomness source to settle a closed Round.
 7. Failure or delay of the Quicknet beacon SHALL NOT authorize replacement of the committed randomness source.
 8. The drand construction SHALL protect target immutability and winner derivation against public participants, relayers, finalizers, and ordinary configuration governance under the deployed code and the Robinhood-operated-sequencer honesty assumption; it SHALL NOT be represented as removing the chain sequencer's inherent ordering and timestamp influence or the separately documented pre-finalization Diamond upgrade trust.
 
@@ -242,7 +240,7 @@ A Round state from which ticket purchases can never resume, including settlement
 
 ### Requirement 10: Permissionless Settlement
 
-**User Story:** As a participant, I want anyone to be able to finalize a sold-out Round after randomness is available, so that payouts do not depend on an administrator or keeper.
+**User Story:** As a participant, I want anyone to be able to finalize a closed Round after randomness is available, so that payouts do not depend on an administrator or keeper.
 
 #### Acceptance Criteria
 
@@ -262,7 +260,7 @@ A Round state from which ticket purchases can never resume, including settlement
 
 #### Acceptance Criteria
 
-1. WHEN a sold-out Round settles, THE Lottery SHALL calculate gross Round revenue from the Round's snapshotted ticket price and ticket count.
+1. WHEN a closed Round settles, THE Lottery SHALL calculate gross Round revenue from the Round's actual receipts (`ticketPrice * soldTickets`).
 2. THE Lottery SHALL allocate the configured Winner Share from gross Round revenue.
 3. THE Lottery SHALL divide the remaining Protocol Share between Statics Operators and the Treasury according to the Round's snapshotted configuration.
 4. THE Winner Share, Operator Share, Treasury Share, and Finalizer Tip SHALL be deterministically derivable from the Configuration Snapshot and gross Round revenue.
@@ -297,7 +295,7 @@ A Round state from which ticket purchases can never resume, including settlement
 5. WHEN Operator revenue is flushed, THE Lottery SHALL approve and contribute the same Payment Token through the supported `OperatorFeeRouter.addRewards` ingress without converting it to another asset.
 6. A successful Router contribution SHALL transfer exactly the requested Payment Token amount from the Lottery to the Router.
 7. IF the Operator Fee Router rejects or cannot currently accept the contribution, THE Pending Operator Revenue SHALL remain accounted and retryable.
-8. A failed Operator revenue flush SHALL NOT affect winner settlement, winner claims, refunds, or other finalized accounting.
+8. A failed Operator revenue flush SHALL NOT affect winner settlement, winner claims or other finalized accounting.
 9. Pending Operator Revenue SHALL NOT be withdrawable as Treasury revenue.
 10. A successful flush SHALL reduce Pending Operator Revenue for only the applicable integration-version and Payment-Token bucket by exactly the amount successfully contributed.
 11. THE Lottery SHALL treat incomplete Router bootstrap, an unregistered or disabled Payment Token, zero Router effective weight, Router capacity limits, token failure, and Router reversion as retryable flush failures.
@@ -309,42 +307,39 @@ A Round state from which ticket purchases can never resume, including settlement
 
 #### Acceptance Criteria
 
-1. THE Lottery SHALL separately account by ERC-20 token for Treasury revenue, Winner liabilities, refund liabilities, Finalizer liabilities, and Pending Operator Revenue.
+1. THE Lottery SHALL separately account by ERC-20 token for Treasury revenue, Winner liabilities, Finalizer liabilities, and Pending Operator Revenue. The reserved refund-liability field SHALL remain zero for new Rounds.
 2. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding winner claim.
-3. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding refund or Finalizer claim.
+3. THE Treasury SHALL NOT be able to withdraw tokens backing an outstanding Finalizer claim.
 4. THE Treasury SHALL NOT be able to withdraw Pending Operator Revenue.
 5. THE Lottery SHALL permit only legitimately available Treasury revenue or provable surplus to leave through Treasury-controlled paths.
 6. Treasury withdrawal authority SHALL NOT modify Round outcomes or liabilities.
 
-### Requirement 15: Unsold Round Expiration and Refunds
+### Requirement 15: Unsold Deadline Draws
 
-**User Story:** As a ticket buyer, I want my full purchase amount returned if the Round never sells out, so that funds are not trapped indefinitely in an unsuccessful lottery.
-
-#### Acceptance Criteria
-
-1. IF a Round has not sold out before its snapshotted expiration deadline, THEN the Round SHALL become eligible for expiration.
-2. AFTER the expiration deadline, ANY account SHALL be able to cause the Round to enter its terminal expired state, or expiry SHALL otherwise be deterministically recognized without privileged intervention.
-3. AN expired Round SHALL NOT select a winner.
-4. AN expired Round SHALL NOT allocate revenue to the Treasury.
-5. AN expired Round SHALL NOT allocate revenue to Statics Operators.
-6. EACH participant in an expired Round SHALL be entitled to a refund in the Round's Payment Token equal to exactly the amount they contributed to that Round.
-7. Refunds SHALL use a pull-based mechanism.
-8. A participant SHALL NOT be able to claim the same refund more than once.
-9. A failed refund transfer SHALL NOT consume the participant's refund entitlement.
-10. AFTER Sellout, a Round SHALL NOT be eligible for the unsold-Round refund path solely because randomness is delayed.
-
-### Requirement 16: Sold-Out Round Finality
-
-**User Story:** As a participant in a sold-out Round, I want the lottery commitment to be final, so that neither losing users nor governance can cancel the Round after every ticket is sold.
+**User Story:** As a buyer, I want the Round to draw at its deadline even if some tickets remain unsold.
 
 #### Acceptance Criteria
 
-1. AFTER Sellout, THE Round SHALL NOT be cancellable.
-2. AFTER Sellout, ticket purchase refunds SHALL NOT be available through the unsold-Round expiration mechanism.
-3. AFTER Sellout, governance SHALL NOT be able to substitute another Quicknet Round.
-4. AFTER Sellout, governance SHALL NOT be able to change the Round's economics.
-5. A sold-out Round SHALL remain settleable whenever its committed valid Quicknet randomness becomes available.
-6. Administrative pause mechanisms SHALL NOT permanently block settlement of a sold-out Round.
+1. AT or after the snapshotted deadline, THE Lottery SHALL reject additional purchases, including a purchase that would sell out the Round.
+2. ANY account SHALL be able to call `settleRound` directly for an unsold Round after its deadline once the exact scheduled beacon is available. No prior close transaction is required.
+3. THE winner SHALL be selected by `uint256(applicationSeed) % soldTickets` and resolved only among purchased tickets.
+4. A one-ticket Round SHALL draw normally. Opening already requires a paid purchase, so no reachable Round has zero sold tickets.
+5. THE Lottery SHALL allocate actual receipts using the snapshotted percentages and Treasury-funded tip cap. No unsold-round refund liability or purchase refund credit SHALL be created.
+6. THE Lottery SHALL NOT expose `expireRound`, `claimRefund`, or `refundableAmount` in a fresh deadline-draw deployment.
+7. Late settlement SHALL use the originally scheduled deadline target, including a valid previously cached beacon, without selecting a new target from the caller's timestamp.
+8. THE stored unsold status SHALL remain `Open` until settlement; eligibility and purchase closure SHALL be determined from the immutable timestamp.
+9. Sales duration SHALL remain a positive configurable `uint32`; 24 hours is an example, not a cap or mandatory default.
+
+### Requirement 16: Draw Finality
+
+**User Story:** As a participant, I want the result fixed by the sales cutoff and scheduled randomness.
+
+#### Acceptance Criteria
+
+1. AFTER early Sellout or the deadline, THE Round SHALL NOT be cancellable or refundable and SHALL NOT accept more purchases.
+2. The effective beacon, snapshotted economics, and ticket entries SHALL remain unchanged through late settlement and configuration changes.
+3. A closed Round SHALL wait for its exact committed beacon without any later-beacon or alternate-entropy fallback.
+4. Pause SHALL NOT block settlement or subsequent claims and revenue delivery.
 
 ### Requirement 17: Restricted Emergency Controls
 
@@ -355,7 +350,7 @@ A Round state from which ticket purchases can never resume, including settlement
 1. IF an emergency pause mechanism exists, THEN it MAY prevent new Round opening or new ticket purchases.
 2. An emergency pause SHALL NOT prevent settlement of already-sold-out Rounds.
 3. An emergency pause SHALL NOT prevent winner claims.
-4. An emergency pause SHALL NOT prevent refunds from expired Rounds.
+4. An emergency pause SHALL NOT prevent settlement of unsold Rounds after their deadline.
 5. An emergency pause SHALL NOT authorize withdrawal of player or Operator liabilities.
 6. An emergency pause SHALL NOT permit replacement of committed randomness.
 7. Emergency authority SHALL NOT modify existing Configuration Snapshots.
@@ -366,10 +361,10 @@ A Round state from which ticket purchases can never resume, including settlement
 
 #### Acceptance Criteria
 
-1. THE Lottery SHALL NOT require an administrator to finalize a sold-out Round.
-2. THE Lottery SHALL NOT require an administrator to expire an unsold Round after its deadline.
+1. THE Lottery SHALL NOT require an administrator to finalize a closed Round.
+2. THE Lottery SHALL NOT require an administrator to settle an unsold Round after its deadline.
 3. THE Lottery SHALL NOT require an administrator to enable winner claims after settlement.
-4. THE Lottery SHALL NOT require an administrator to enable refunds after expiration.
+4. THE Lottery SHALL permit deadline settlement in one transaction without a separate close call.
 5. THE Lottery SHALL NOT require an administrator to flush already-accounted Operator revenue.
 6. IF no privileged actor takes any action after a Round opens, users SHALL still have a protocol path to reach the appropriate terminal state once the objective preconditions are satisfied.
 
@@ -382,9 +377,9 @@ A Round state from which ticket purchases can never resume, including settlement
 1. FOR every Round, total distributed, claimable, refundable, Treasury-accounted, and Operator-accounted value SHALL NOT exceed the Round's Payment Token legitimately received for that Round.
 2. A ticket purchase SHALL increase the Round's accounted receipts by exactly the amount paid.
 3. Settlement SHALL reclassify Round receipts into deterministic liabilities and revenue buckets without creating additional principal.
-4. Expiration SHALL reclassify participant deposits into refund liabilities without creating Treasury or Operator revenue.
+4. Deadline settlement SHALL reclassify actual receipts into winner, Operator, Treasury, and finalizer allocations without creating refunds.
 5. A successful winner claim SHALL reduce winner liability by exactly the amount transferred.
-6. A successful refund SHALL reduce refund liability by exactly the amount transferred.
+6. New Rounds SHALL never create refund liability or refund credits. Legacy refund storage slots SHALL remain reserved.
 7. A successful Operator flush SHALL reduce Pending Operator Revenue by exactly the amount transferred into the supported Operator revenue path.
 8. Treasury withdrawals SHALL reduce only Treasury-available balances.
 9. Accounting for one Payment Token SHALL NOT consume, offset, or rely upon custody of another token.
@@ -398,9 +393,9 @@ A Round state from which ticket purchases can never resume, including settlement
 
 #### Acceptance Criteria
 
-1. External value-transfer paths SHALL be protected against reentrant double claims or double refunds.
+1. External value-transfer paths SHALL be protected against reentrant double claims.
 2. A failed winner transfer SHALL preserve the winner's claim.
-3. A failed refund transfer SHALL preserve the refund claim.
+3. A failed deadline-winner transfer SHALL preserve the winner claim.
 4. A failed Treasury transfer SHALL NOT consume Treasury accounting incorrectly.
 5. A failed Payment Token or Operator Fee Router interaction SHALL preserve Pending Operator Revenue.
 6. A failed external call SHALL NOT permit a Round to settle twice or alter its winner.
@@ -416,10 +411,10 @@ A Round state from which ticket purchases can never resume, including settlement
 2. THE Lottery SHALL expose each Round's immutable Configuration Snapshot.
 3. THE Lottery SHALL expose each Round's lifecycle status.
 4. THE Lottery SHALL expose ticket sales progress.
-5. THE Lottery SHALL expose the committed Quicknet Round after Sellout.
+5. THE Lottery SHALL expose the scheduled Quicknet Round from opening and emit every deterministic early-Sellout rescheduling.
 6. THE Lottery SHALL expose the winning ticket and winner after settlement.
-7. THE Lottery SHALL expose outstanding winner, refund, Finalizer, Treasury, and Operator accounting by token needed to verify solvency.
-8. THE Lottery SHALL emit events sufficient for an indexer to reconstruct Round opening, purchases, Sellout, randomness commitment, settlement, claims, expiration, refunds, configuration changes, Treasury movement, and Operator revenue flushing.
+7. THE Lottery SHALL expose outstanding winner, Finalizer, Treasury, and Operator accounting by token needed to verify solvency, retaining the reserved refund-liability field for storage compatibility.
+8. THE Lottery SHALL emit events sufficient for an indexer to reconstruct Round opening, purchases, Sellout, randomness commitment, settlement, claims, deadline scheduling, configuration changes, Treasury movement, and Operator revenue flushing.
 
 ### Requirement 22: External Dependency Isolation
 
@@ -446,10 +441,10 @@ A Round state from which ticket purchases can never resume, including settlement
 3. Testnet validation SHALL use an actual drand Quicknet beacon rather than mocked production randomness for the final integration test.
 4. Testnet validation SHALL demonstrate onchain verification of a valid Quicknet proof through the shared Registry.
 5. Testnet validation SHALL demonstrate a complete Round from ticket purchases through Sellout, randomness availability, settlement, and winner claim.
-6. Testnet validation SHALL demonstrate expiration and full refunds for an unsold Round.
+6. A fresh testnet rehearsal SHALL demonstrate an unsold deadline draw with a real committed beacon, actual-receipt allocations, and winner claim. Historical refund evidence SHALL NOT count as validation of the new behavior.
 7. Testnet validation SHALL demonstrate that failed Operator revenue ingress does not block Round settlement.
 8. Testnet validation SHALL demonstrate successful direct contribution of each exercised Payment Token to the configured Operator Fee Router integration when that dependency is available.
-9. Testnet validation SHALL demonstrate concurrent active Rounds using at least two different governance-enabled Payment Tokens, including isolated purchase, settlement, claim, refund, Treasury, and Operator accounting.
+9. Testnet validation SHALL demonstrate concurrent active Rounds using at least two different governance-enabled Payment Tokens, including isolated purchase, settlement, claim, deadline-draw, Treasury, and Operator accounting.
 10. Testnet validation SHALL demonstrate the production L2 timestamp-based target-selection path but SHALL NOT be represented as proving resistance to a malicious Robinhood sequencer.
 
 ### Requirement 24: Diamond Upgradeability and Permanent Immutability
@@ -508,12 +503,12 @@ A Round state from which ticket purchases can never resume, including settlement
 - Randomness comes exclusively from a previously committed drand Quicknet Round scheduled strictly after the L2 commitment boundary and verified by `EqualFiDrandRegistry`.
 - The Round-selection freshness claim assumes honest transaction ordering and L2 timestamp progression by the Robinhood-operated sequencer; malicious behavior violates that accepted chain trust assumption.
 - Sold-out Rounds have no blockhash, `prevrandao`, administrator, or alternate-RNG fallback.
-- Unsold expired Rounds return 100% of participant principal.
+- Unsold Rounds draw among sold tickets after their configured deadline and distribute actual receipts.
 - Sold-out Rounds cannot be cancelled.
-- Winner payouts and refunds are pull-based.
+- Winner and finalizer payouts are pull-based.
 - Operator reward distribution is handled by the standalone `OperatorFeeRouter`.
 - Operator revenue is contributed directly in the Round's Payment Token without wrapping or conversion.
-- Failure of Operator revenue routing cannot block settlement, claims, or refunds.
+- Failure of Operator revenue routing cannot block settlement, claims, or revenue delivery.
 - Existing Round configuration cannot be changed retroactively.
 - All tunable economic and operational values are governance-configurable for future Rounds.
 - The immutable drand Registry is a release-critical formal-verification target with an explicit trusted computing base and no unresolved required proof results.

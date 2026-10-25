@@ -1,9 +1,13 @@
 # Statics Lottery Release Checkpoint
 
+> Historical release evidence: the deployment, audit disposition, and proof hashes below bind the original sellout/refund release. They do not establish assurance for deadline draws. The current candidate requires its own review, CI, and formal evidence; a new live testnet rehearsal has not been executed.
+
 This checkpoint consolidates the release evidence for Statics Lottery. It is an audit-readiness
 decision, not a production deployment approval. The Robinhood Testnet deployment remains a
 disposable lifecycle rehearsal, and production governance, roles, integrations, and Payment Tokens
 must be approved separately.
+
+Current deadline-draw source evidence is recorded in [the dedicated formal report](../formal/reports/lottery-deadline-draws.md): 15/15 required rules pass for its pinned candidate. The old testnet lifecycle below remains historical; a fresh deadline-draw deployment has not been rehearsed.
 
 ## Candidate lineage
 
@@ -18,8 +22,8 @@ must be approved separately.
 - No production Solidity changed after the deployed source snapshot. The exact pull-request head
   and its terminal CI run are the authoritative final candidate evidence.
 
-The source of truth and complete review boundary are listed in
-[`audit-scope.md`](audit-scope.md).
+The normative source of truth is the [requirements](../specs/requirements.md) and
+[design](../specs/design.md).
 
 ## Independent review disposition
 
@@ -36,8 +40,9 @@ chain-specific behavior, and access control.
   shapes, and the complete lifecycle manifest subsequently validated on Robinhood Testnet chain
   `46630`.
 
-These results do not remove the explicit trust assumptions and production-deployment gaps in
-[`audit-scope.md`](audit-scope.md).
+These results do not remove the trust assumptions and production-deployment gaps documented in
+[the randomness model](randomness.md#trusted-computing-base-and-exclusions) and
+[the governance deployment checklist](governance.md#deployment-checklist).
 
 ## Final invariant review
 

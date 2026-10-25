@@ -50,7 +50,7 @@ An independent enable flag controls whether a version may open a future Round. D
 - prevents only new `openRound` calls;
 - does not close or mutate an existing Round;
 - does not change the Round's token, economics, deadline, or beacon; and
-- does not block settlement, expiration, claims, or revenue delivery.
+- does not block settlement, claims, or revenue delivery.
 
 Re-enabling the same version permits a new Round after its prior Round is terminal, subject to the
 global concurrency limit.
@@ -93,8 +93,8 @@ The pause flag gates exactly:
 
 It does not gate:
 
-- `expireRound` or `settleRound`;
-- winner, refund, or finalizer claims;
+- `settleRound` for sellout or deadline draws;
+- winner or finalizer claims;
 - Operator or Treasury delivery;
 - token or native surplus handling; or
 - any view.
@@ -109,7 +109,7 @@ functions merely by being the recipient. Public callers may deliver recorded Tre
 to the current configured address.
 
 Changing the recipient can redirect funds already classified as Treasury revenue. It cannot touch
-winner, refund, finalizer, or Operator liabilities. Production governance should treat a recipient
+winner, finalizer, or Operator liabilities. Production governance should treat a recipient
 change as a value-routing action subject to the same external timelock review as other operational
 parameters.
 
@@ -184,3 +184,7 @@ Before a production deployment or authority change, verify:
 
 The disposable Robinhood Testnet manifest uses one EOA for authority, guardian, and Treasury to
 exercise the bounded lifecycle. It is explicitly not a production governance configuration.
+
+## Deadline-draw release boundary
+
+Sales duration remains a positive configurable `uint32`, including periods longer than 24 hours. Existing Round snapshots cannot be changed by configuration governance. The historical finalized testnet Diamond cannot receive this behavior; deploy a fresh Diamond after separate authorization. Historical refund evidence above describes the old release only.

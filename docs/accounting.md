@@ -30,7 +30,7 @@ For each admitted token address `asset`, the Diamond stores:
 |---|---|
 | `activeRoundEscrow` | Ticket receipts still backing open or sold-out Rounds |
 | `winnerLiability` | Settled proceeds not yet claimed by winners |
-| `refundLiability` | Expired-Round principal not yet refunded |
+| `refundLiability` | Reserved legacy slot; zero for fresh deadline-draw deployments |
 | `finalizerLiability` | Recorded settlement tips not yet claimed |
 | `pendingOperatorRevenueTotal` | Operator proceeds not yet accepted by a Router |
 | `treasuryAvailable` | Treasury proceeds or absorbed surplus not yet delivered |
@@ -69,7 +69,6 @@ Before calling the token, the transaction records:
 ```text
 round.soldTickets                  += q
 round.receipts                     += amount
-refundCredit[roundId][buyer]       += amount
 assetAccounting[token].activeRoundEscrow += amount
 ```
 
@@ -82,7 +81,7 @@ diamondAfter - diamondBefore   == amount
 
 Both equalities are required. Receiver-fee, sender-fee, rebasing, balance-drift, false-return, or
 otherwise inexact behavior reverts the complete transaction, including the earlier storage writes.
-A direct token transfer to the Diamond never creates tickets or refund credit.
+A direct token transfer to the Diamond never creates tickets or participant claims.
 
 ## Successful settlement
 
@@ -118,22 +117,11 @@ finalizerLiability                            += finalizer
 It does not call the Payment Token, winner, Treasury recipient, or Operator Router. A blocked
 recipient or unavailable Router therefore cannot prevent the Round from becoming `Settled`.
 
-## Unsold expiration and refunds
+## Unsold deadline accounting
 
-After an unsold open Round reaches `expiresAt`, anyone may expire it:
+At the sales deadline an unsold Round stops accepting tickets, then settles using its recorded beacon and the same allocation formula. `gross = ticketPrice * soldTickets`, not the configured ticket cap. The winner is selected among sold tickets only. One-ticket Rounds follow the same percentages and Treasury-funded tip cap.
 
-```text
-activeRoundEscrow -= round.receipts
-refundLiability   += round.receipts
-```
-
-No winner, Operator, Treasury, or finalizer allocation is created. Each successful purchase has
-already increased that buyer's `refundCredit` by the exact principal paid, so the sum of credits
-equals the Round's receipts.
-
-`claimRefund` clears the caller's credit and reduces aggregate refund liability before pushing the
-same amount. A transfer failure or inexact delta reverts both changes. A successful claim cannot be
-repeated.
+No timeout refund is available, and new purchases never write refund credits. The unused refund ledger fields remain in their historical positions for layout compatibility; the new public surface omits expiry/refund selectors. Existing historical deployments are not migrated by this change.
 
 ## Winner and finalizer claims
 
@@ -181,7 +169,7 @@ its own then-current synchronized weights. See
 `flushTreasury(asset, amount)` is permissionless, but its receiver is always the current
 governance-configured Treasury recipient. The caller cannot redirect it. The function caps `amount`
 at `treasuryAvailable`, decreases that field before interaction, and requires an exact outbound
-transfer. Winner, refund, finalizer, and Operator liabilities are never Treasury-withdrawable.
+transfer. Winner, finalizer, and Operator liabilities are never Treasury-withdrawable. The reserved refund-liability field remains protected in solvency accounting and stays zero for new Rounds.
 
 Changing the Treasury recipient affects later delivery of already-recorded Treasury funds, but it
 does not change any participant or Operator entitlement.
@@ -210,14 +198,16 @@ configured Treasury recipient and never touches ERC-20 accounting.
 The following layers exercise the accounting model independently:
 
 - unit and integration tests cover exact ingress/egress, fee and sender-fee tokens, rebasing or
-  drift behavior, claims, refunds, Router rollback, surplus, and same-ledger aliases;
+  drift behavior, deadline draws, claims, Router rollback, surplus, and same-ledger aliases;
 - fuzz and stateful invariant tests cover revenue conservation, solvency, terminal monotonicity,
   concurrent Rounds, and cross-token isolation;
 - the Lottery Halmos report proves bounded allocation/accounting transitions, claim
   non-repeatability, Operator flush atomicity, and isolated-token non-mutation; and
-- [`deployments/robinhood-testnet/lifecycle.json`](../deployments/robinhood-testnet/lifecycle.json)
+- The historical [`deployments/robinhood-testnet/lifecycle.json`](../deployments/robinhood-testnet/lifecycle.json)
   records concurrent WETH and STATICS Rounds whose claims, refund, Treasury proceeds, and Operator
   funding return the Diamond's recorded liabilities and token balances to zero.
 
-The proof bounds and exclusions are summarized in
-[audit-scope.md](audit-scope.md#formal-verification-boundary).
+The historical proof bounds and exclusions are recorded in the
+[Lottery security-gate report](../formal/reports/lottery-security-gate.md#bounds-and-exclusions).
+
+The historical lifecycle and original proof report do not establish the deadline-draw candidate. New live testnet execution remains pending; candidate formal evidence is recorded separately.
