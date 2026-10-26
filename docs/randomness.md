@@ -12,7 +12,7 @@ The release-critical Registry claim is:
 > `EqualFiDrandRegistry` corresponds to a valid Quicknet signature for exactly that Round,
 > produces one canonical Round-bound randomness value, and can never be replaced.
 
-The Lottery formal package checks a narrower application boundary: production helpers schedule the Registry-selected target strictly after the opening deadline or early-sellout boundary, and later configuration-catalog changes do not alter it. Deadline rules exercise the purchase cutoff, settlement readiness, sold-ticket winner selection, and actual-receipt accounting under documented synthetic preconditions. See the candidate-specific report in `formal/reports/` for completed results and bounds. These rules do not re-prove Registry cryptography.
+The Lottery formal package checks a narrower application boundary: production helpers schedule the Registry-selected target strictly after the opening deadline or early-sellout boundary, and later configuration-catalog changes do not alter it. Deadline rules exercise the purchase cutoff, settlement readiness, sold-ticket winner selection, and actual-receipt accounting under documented synthetic preconditions. See the [formal coverage and proof boundaries](../formal/README.md). These rules do not re-prove Registry cryptography.
 
 ## Deadline and sellout schedules
 
@@ -139,10 +139,10 @@ Registry dependency at `docs/formal-verification.md` and `formal/results/f8db2a1
 | Halmos / Z3 | `0.3.3` / `4.12.6` |
 | Result | 12 of 12 required rules pass; no counterexamples, bounded loops, timeout, or unknown |
 
-The Lottery report and machine-readable evidence are
-[`formal/reports/lottery-security-gate.md`](../formal/reports/lottery-security-gate.md) and
-[`formal/evidence/lottery-halmos-0e92aaf.json`](../formal/evidence/lottery-halmos-0e92aaf.json).
-They bind the proof inputs and compiled production runtime hashes.
+Detailed reports and machine-readable execution results are retained privately.
+The [formal package](../formal/README.md) describes the coverage and assumptions;
+[Certora reproduction instructions](../formal/certora/README.md) accompany the
+versioned specifications and harnesses.
 
 ## Evidence classes
 

@@ -5,5 +5,12 @@
 /.env.*
 !.env.example
 *.swp
-/formal/results/**/*.log
-/formal/results/**/*.exit
+__pycache__/
+/.private-formal/
+/.certora-results/
+/.certora-tools/
+/.certora_internal/
+/emv-*-certora-*/
+/formal/results/
+/formal/evidence/
+/formal/reports/
