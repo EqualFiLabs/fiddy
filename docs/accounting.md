@@ -207,7 +207,8 @@ The following layers exercise the accounting model independently:
   records concurrent WETH and STATICS Rounds whose claims, refund, Treasury proceeds, and Operator
   funding return the Diamond's recorded liabilities and token balances to zero.
 
-The historical proof bounds and exclusions are recorded in the
-[Lottery security-gate report](../formal/reports/lottery-security-gate.md#bounds-and-exclusions).
+Proof scope and exclusions are described in the
+[formal coverage summary](../formal/README.md). Detailed execution reports and
+generated proof results are retained privately.
 
 The historical lifecycle and original proof report do not establish the deadline-draw candidate. New live testnet execution remains pending; candidate formal evidence is recorded separately.

@@ -1,8 +1,14 @@
 # Statics Lottery formal targets
 
-This package defines bounded symbolic properties over the production Lottery facets. Formal
-execution is allowed only in CI or on the dedicated verification system described in the private
-operator tooling. Do not install, probe, or invoke Halmos on an ordinary development host.
+This package defines symbolic properties over the production Lottery facets and inductive
+accounting properties. Formal execution is restricted to the dedicated verification system
+described in the private operator tooling. Do not install, probe, or invoke Halmos
+on an ordinary development host.
+
+Certora proof definitions and clone-to-run instructions are in
+[certora/README.md](certora/README.md). Specifications, harnesses, configurations
+and execution tooling are versioned; generated results, logs, counterexamples
+and internal reports remain private and ignored.
 
 ## Required Halmos rules
 
@@ -91,3 +97,179 @@ distribution, arbitrary ERC-20 behavior, governance honesty, sequencer ordering 
 honesty, compiler correctness, target-client correctness, or Robinhood runtime behavior. Foundry
 fuzz/invariant tests, the Registry proof package, integration tests, audit review, and Robinhood
 testnet validation are separate evidence.
+
+## Additional local verification campaign
+
+An expanded private campaign assesses production commit
+`795425ef6a8830278b56b9052aa2271e92930eb3`. All workloads execute on the dedicated
+verification system, including the source-built local Certora prover; there are
+no hosted proof submissions. Production Solidity and compiler policy are unchanged.
+The coverage summary below describes that campaign. Accepted Certora definitions
+are now versioned for reproduction; internal reports, diagnostics and generated
+result artifacts stay in private recoverable storage.
+
+The expansion adds arbitrary-prior-ledger settlement conservation across all six
+buckets, full production-width allocation and receipt arithmetic, full-width
+claim and partial Operator-delivery transitions, surplus absorption, paid entry
+and atomic sellout behavior, multiple-owner ticket boundaries, production
+settlement flow, and first-post Registry composition under primitive summaries.
+
+The paid-entry proof has two families: arbitrary prices with a three-ticket cap,
+and arbitrary valid ticket quantities at price one. The production settlement
+flow uses three one-ticket owners and fixed economics; separate rules prove
+allocation widths and arbitrary three-range ownership boundaries. Arbitrary-ledger
+transition properties assume a solvent prestate and bounded aggregate credits;
+they do not establish unbounded whole-protocol history invariants. The continuation below
+adds a separate inductive accounting model.
+
+Expanded Halmos partitions use an isolated copy of version 0.3.3 with three
+byte-to-bit width corrections in its SHA256/MODEXP primitive summaries. Positive
+congruence and intentionally false-property controls exercise that model. The
+original suites use stock Halmos. The private evidence records the precise tool
+diff, binary and input hashes, verification and deployment-compilation runtimes,
+compiler settings, non-vacuity checks, and per-rule outcomes. The primitive models
+do not establish cryptographic security or target-client precompile correctness.
+
+The pinned Router's existing formal suite is rerun separately with its own
+Solidity 0.8.33/Cancun configuration. Deployment readiness remains separate from
+these bounded formal properties. An unresolved or timed-out obligation is never
+counted as a passing result, and the campaign does not constitute mainnet sign-off.
+
+Results for this campaign:
+
+| Suite | Passing properties | Incomplete properties |
+| --- | ---: | ---: |
+| Original Lottery Halmos | 15 | 0 |
+| Original Registry Halmos | 34 | 0 |
+| Expanded Halmos | 11 | 2 |
+| Pinned Router Halmos | 5 | 0 |
+| Registry local Certora | 10 | 0 |
+| Expanded local Certora | 6 | 0 |
+| Pinned Router local Certora | 11 | 0 |
+
+The initial two incomplete obligations were compressed-signature first-post
+acceptance and rejection composition; their full-coordinate runs exceeded the 15-minute
+execution limit. The continuation below discharges both obligations. Uncompressed
+first-post composition,
+malformed pairing return handling, and invalid encoding rejection pass. Five
+isolated mutation controls each produce the expected counterexample. Separate
+concrete validation passes 130 Lottery tests, 33 Registry tests, and five expanded
+tests, including four fuzz tests at 1,024 runs each.
+
+## Inductive history and compressed-signature continuation
+
+A private continuation uses the same production commit, compiler policy and
+local-only execution environment. Production Solidity remains unchanged. The
+following results supplement the preceding campaign rather than replacing its
+original evidence.
+
+| Continuation | Result |
+| --- | --- |
+| Production compressed first-post composition | 2 passing properties |
+| Total decoder and modular composition cross-checks | 3 passing properties |
+| Arbitrary-history accounting | 14 passing inductive invariants |
+| Existing-round snapshot preservation | 1 passing parametric rule |
+| Accounting mutation controls | 8 expected counterexamples |
+| Compressed composition negative controls | 2 expected counterexamples |
+| Independent width-correction calibration | 7 positive symbolic properties, 3 expected negative counterexamples, 5 concrete tests |
+| Concurrent lifecycle and stateful witnesses | 5 passing concrete tests across 4 suites |
+
+Both compressed first-post properties now pass against unchanged production
+Registry and decoder code with a 30-minute execution cap. Acceptance establishes
+canonical randomness and permanent cache behavior; pairing rejection leaves
+storage unchanged. The rules retain full canonical coordinate widths, both sign
+flags and every positive round. Neither result has a counterexample, stuck path
+or bounded-loop warning. The earlier 15-minute timeouts remain historical
+incomplete runs, and their two obligations are now discharged by these direct
+production proofs.
+
+Three supplementary properties prove a total full-width decoder lemma and both
+posting outcomes using its established result as an input-bound summary. The
+source refinement and shared input domain receive independent agent review; a
+strict private gate requires the direct proofs, all three supplementary proofs
+and their exact source/tool bindings.
+
+The history model uses actual Lottery, Settlement, Claims, Revenue and Governance
+facet code with shared namespaced storage. Constructor bases and preservation
+across all 23 facet functions prove per-token solvency, aggregate liabilities,
+receipt accounting, zero refunds, configuration economics, fresh round storage,
+active counts and slot consistency. A separate parametric rule preserves existing
+round snapshots. These proofs use induction without a fixed transaction count,
+round count or three-round ownership bound. Production integer widths and the
+intrinsic concurrency limit remain in effect.
+
+The induction assumes exact-transfer, non-rebasing tokens, passive summarized
+external dependencies and a fixed facet set. Token summaries permit donations
+but omit callbacks and external balance decreases. Ticket-owner search is
+abstracted, so arbitrary ownership-search correctness and winner fairness are
+outside this theorem. Initialization correspondence is reviewed at source level;
+Diamond dispatch and upgrades are separate obligations. The concrete witnesses
+exercise the actual Diamond and concurrent two-token lifecycles; bounded stateful
+runs supplement the inductive proofs.
+
+Independent agent review qualifies the isolated Halmos width correction for the
+Registry's actual nonempty SHA inputs and concrete nonzero MODEXP output lengths.
+It also reproduces unsupported boundary cases. SHA256 and MODEXP remain
+uninterpreted primitive functions, with canonical field outputs and successful
+execution assumed. These results do not prove cryptographic arithmetic,
+precompile gas behavior or target-chain implementation correctness. Independent
+agent review is distinct from third-party assurance.
+
+Private evidence retains per-rule inventories, compiler scenes, source and
+specification hashes, verification/deployment-compilation runtime hashes,
+configuration, tool pins, assumptions, reviews and mutation counterexamples.
+Target-chain rehearsal, deployed lifecycle compatibility and mainnet readiness
+remain separate release evidence.
+
+## Ownership, initialization and callback boundary closure
+
+A further private campaign uses the same production commit and compiler policy.
+The following guarantees supplement the original accounting induction; its
+frozen passive-dependency model is retained rather than relabeled as a different
+proof.
+
+Ticket-range induction establishes nonzero owners, strictly increasing full-width
+endpoints, capacity and sold-ticket coverage across actual facet histories.
+An exact-source loop refinement proves initialization, window preservation,
+halving, convergence and unique interval membership for owner lookup. The
+production endpoint width implies at most 32 search iterations, without a small
+range-count bound. A separate production settlement property places the selected
+ticket inside the sold range. Resource-heavy monolithic search diagnostics are
+not counted as passing proofs.
+
+Actual Diamond checks cover dispatch context, shared storage, revert propagation,
+selector replacement/removal, initialization and irreversible cut finalization.
+Four routing invariants hold inductively across arbitrary successful selector
+operations. Reviewed source composition extends those operations to batches;
+failed batches retain their prestate through EVM rollback. Initializer checks
+combine actual compiled execution and all-calldata rejection guards with an
+exact-source configuration-element induction. A pinned OpenZeppelin timelock
+composition checks delay, cancellation, rescheduling and finalization. These
+results require approved initialization and facet code: routing consistency does
+not establish accounting safety for arbitrary new implementations.
+
+Callback closure combines arbitrary-input rejection at all nine protected
+entrypoints, successful guard restoration, governance callback preservation of
+existing ledgers and round snapshots, and three full-width observed transfer-delta
+lemmas. Separate failed-execution obligations check cross-contract rollback.
+Concrete callback fuzzing and an adversarial behavior matrix supplement these
+proofs. The custody bridge retains the admitted-token assumptions: truthful balance
+observations, exact-transfer/non-rebasing behavior, ordinary approval semantics
+and no exogenous balance decrease. Failed symbolic diagnostics are retained
+separately and never counted as passing evidence.
+
+Read-only calls against both target-network clients pass three primitive vectors
+and 17 candidate verifier/Registry checks per network at recorded blocks. Both
+networks also pass a concurrent-round lifecycle on pinned forks using the actual
+initializer, Diamond facets, Registry and pinned Router code, including reward
+claims. Native-client calls and Foundry fork execution are separate evidence;
+the fork uses fixture assets and Operator identities with an explicit local time
+warp. Compiler artifacts, override runtimes and result records are bound together
+by strict private provenance gates and independently reviewed.
+
+These are compositional guarantees under documented assumptions, distinct from
+third-party assurance or a production deployment sign-off. Deployment-bound
+runtime/configuration and authority-role verification remain release conditions.
+Cryptographic security, compiler/EVM correctness, gas availability, governance
+honesty, admitted-token behavior and honest sequencer time/order remain trust
+boundaries. Router deployment remains outside this assessment.

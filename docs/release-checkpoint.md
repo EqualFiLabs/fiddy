@@ -7,7 +7,7 @@ decision, not a production deployment approval. The Robinhood Testnet deployment
 disposable lifecycle rehearsal, and production governance, roles, integrations, and Payment Tokens
 must be approved separately.
 
-Current deadline-draw source evidence is recorded in [the dedicated formal report](../formal/reports/lottery-deadline-draws.md): 15/15 required rules pass for its pinned candidate. The old testnet lifecycle below remains historical; a fresh deadline-draw deployment has not been rehearsed.
+Current deadline-draw proof coverage is described in the [formal summary](../formal/README.md), with versioned [Certora definitions and reproduction instructions](../formal/certora/README.md). Detailed reports and generated results are retained privately. The old testnet lifecycle below remains historical; a fresh deadline-draw deployment has not been rehearsed.
 
 ## Candidate lineage
 
