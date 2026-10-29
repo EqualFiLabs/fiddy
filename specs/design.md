@@ -411,6 +411,10 @@ through `buyTickets`. An account therefore cannot fill multiple global slots wit
 one-ticket Rounds under one low-demand configuration. Governance should keep the global limit at
 least as large as the intended concurrently enabled configuration set.
 
+The initial global concurrency limit is 100 active Rounds. Governance can change
+it through `setMaxActiveRounds`; the one-active-Round-per-Configuration rule still
+applies, so using all 100 slots requires 100 distinct enabled Configuration Versions.
+
 `openRound` and `buyTickets` use the Diamond-wide reentrancy guard because the configured Payment Token is an external contract.
 
 ### Additional Purchases
@@ -510,6 +514,13 @@ uint32 winningTicket =
 Ticket positions are zero-based. Because `soldTickets` is bounded to `uint32`, modulo bias from a 256-bit seed is negligible. The winning ticket owner is found using binary search over cumulative purchase ranges.
 
 ### Revenue Calculation
+
+Initial deployment defaults use `winnerBps = 5000` and `operatorProtocolBps = 4000`.
+The Winner receives 50% of gross receipts; Operators receive 40% of the remaining
+50%, equivalent to 20% of gross receipts. Treasury receives the remainder, nominally
+30% before its Finalizer Tip and integer rounding. Governance can create and enable
+a new Configuration Version after deployment, including after code finalization;
+existing Rounds retain their original Configuration Snapshot.
 
 ```solidity
 uint256 constant BPS = 10_000;

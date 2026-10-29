@@ -125,6 +125,7 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 7. THE Lottery SHALL reject configurations whose values violate required accounting, token-compatibility, or lifecycle invariants.
 8. Governance SHALL be able to set a configurable parameter to zero when zero is a semantically valid value, including disabling an optional Finalizer Tip or optional per-purchase limit.
 9. THE Lottery SHALL NOT require redeployment solely to add an approved Payment Token or change a tunable Round parameter for future Rounds.
+10. Initial deployment defaults SHALL allocate 50% of gross receipts to the Winner, 20% to Operators, and the remainder to Treasury before the Finalizer Tip. These defaults SHALL remain governance-configurable for future Rounds.
 
 ### Requirement 2: Timelocked Configuration Changes
 
@@ -165,6 +166,7 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 6. THE Lottery SHALL permit concurrent active Rounds to use different enabled Round Configuration Versions and different Payment Tokens.
 7. Disabling a Round Configuration Version SHALL prevent new Rounds from opening from that version but SHALL NOT alter or pause a Round already opened from it.
 8. A Round Configuration Version SHALL have at most one non-terminal Round at a time, so capacity occupied by that version always represents a Round that additional participants can join.
+9. Initial deployment SHALL default to a global active-Round concurrency limit of 100. Governance SHALL retain the ability to change this limit after deployment.
 
 ### Requirement 5: Governance-Approved ERC-20 Ticket Purchases
 
