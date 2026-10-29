@@ -17,3 +17,10 @@ This change supersedes the original sellout-only/refund implementation plan. The
 - Concurrent tokens remain isolated, refunds are unreachable, and next opening is permitted only after prior settlement.
 - New deployment tooling covers both paths; the new live testnet rehearsal is pending separate authorization and is not claimed as executed.
 - Historical finalized deployments are not upgraded. No mainnet deployment or merge is part of this delivery.
+
+## Deployment defaults
+
+- Set initial deployment economics to 50% Winner, 30% Treasury before the Finalizer Tip, and 20% Operators using `winnerBps = 5000` and `operatorProtocolBps = 4000`.
+- Set the initial global concurrency limit to 100 active Rounds, retaining governance control and one active Round per Configuration Version.
+- Exercise the deployment configuration through actual ERC-20 purchases, settlement and payouts; verify that changing configuration after code finalization preserves existing Round economics.
+- Preserve historical deployment manifests and their recorded economics.

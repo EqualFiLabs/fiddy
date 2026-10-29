@@ -51,12 +51,13 @@ contract DeployLottery is Script {
     bytes32 internal constant STATICS_CODEHASH =
         0xe548428d65bf2a8cee29a63e8dfaaeda0b4d44294d80f67f7626e1da8b89be69;
 
-    uint16 internal constant MAX_ACTIVE_ROUNDS = 2;
+    uint16 internal constant MAX_ACTIVE_ROUNDS = 100;
     uint32 internal constant TICKET_COUNT = 5;
     uint32 internal constant SALES_DURATION = 120;
     uint32 internal constant RANDOMNESS_DELAY = 6;
-    uint16 internal constant WINNER_BPS = 8000;
-    uint16 internal constant OPERATOR_PROTOCOL_BPS = 5000;
+    uint16 internal constant WINNER_BPS = 5000;
+    // Operators receive 40% of the remaining 50%, or 20% of gross receipts.
+    uint16 internal constant OPERATOR_PROTOCOL_BPS = 4000;
 
     uint96 internal constant WETH_TICKET_PRICE = 0.000_01 ether;
     uint96 internal constant WETH_FINALIZER_TIP = 0.000_001 ether;

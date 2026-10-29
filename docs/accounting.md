@@ -87,6 +87,18 @@ A direct token transfer to the Diamond never creates tickets or participant clai
 
 Let `gross = round.receipts` and `D = 10_000`:
 
+The deployment defaults are 50% Winner, 20% Operators and the remaining 30% Treasury
+before the Finalizer Tip and integer rounding. They use `winnerBps = 5000` and
+`operatorProtocolBps = 4000`, because the Operator percentage applies to the Protocol
+Share after the Winner allocation. For 100 units received and a 1-unit Finalizer Tip,
+the allocations are 50 Winner, 20 Operators, 29 Treasury and 1 Finalizer.
+
+After deployment, the authority can call `createLotteryConfig` with new economics,
+enable that version through `setLotteryConfigEnabled`, and disable older versions
+for new openings. Existing Rounds retain their snapshots and original payouts.
+These configuration powers remain available after `finalizeProtocol` disables
+Diamond upgrades. Historical deployment manifests retain their original settings.
+
 ```text
 winner       = floor(gross * winnerBps / D)
 protocol     = gross - winner
