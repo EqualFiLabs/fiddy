@@ -2,6 +2,10 @@
 pragma solidity 0.8.30;
 
 import { IGovernance } from "../interfaces/IGovernance.sol";
+import { LibFiddy } from "../libraries/LibFiddy.sol";
+import { LibFiddyStorage } from "../libraries/LibFiddyStorage.sol";
+import { FiddyConfig } from "../shared/FiddyTypes.sol";
+import { FiddyErrors } from "../shared/FiddyErrors.sol";
 import { LibDiamond } from "../libraries/LibDiamond.sol";
 import { LibLotteryConfig } from "../libraries/LibLotteryConfig.sol";
 import { LibLotteryStorage } from "../libraries/LibLotteryStorage.sol";
@@ -19,6 +23,25 @@ contract GovernanceFacet is IGovernance {
         onlyAuthority
         returns (uint64 version)
     {
+        return _createConfig(config);
+    }
+
+    function createRewardLotteryConfig(LotteryConfig calldata config, FiddyConfig calldata rewards)
+        external
+        onlyAuthority
+        returns (uint64 version)
+    {
+        LibFiddy.enforceInitialized();
+        if (
+            uint256(config.operatorProtocolBps) + rewards.stakerProtocolBps > 10_000
+                || (!rewards.participation && rewards.unitsPerTicket != 0)
+        ) revert FiddyErrors.InvalidRewardsConfig();
+        version = _createConfig(config);
+        LibFiddyStorage.state().configs[version] = rewards;
+        emit FiddyConfigCreated(version, rewards);
+    }
+
+    function _createConfig(LotteryConfig calldata config) private returns (uint64 version) {
         LibLotteryConfig.validate(config);
         LibLotteryStorage.GameStorage storage gs = LibLotteryStorage.gameStorage();
 

@@ -6,6 +6,10 @@ import { IStaticsExternalModules } from "../../src/interfaces/IStaticsExternalMo
 import { FiddyTokenFacet } from "../../src/facets/FiddyTokenFacet.sol";
 import { FiddyViewFacet } from "../../src/facets/FiddyViewFacet.sol";
 import { FiddySelectors } from "../../src/libraries/FiddySelectors.sol";
+import { LotteryFacet } from "../../src/facets/LotteryFacet.sol";
+import { GovernanceFacet } from "../../src/facets/GovernanceFacet.sol";
+import { ILottery } from "../../src/interfaces/ILottery.sol";
+import { IGovernance } from "../../src/interfaces/IGovernance.sol";
 import { IDiamondCut } from "../../src/interfaces/IDiamondCut.sol";
 import { FacetCut } from "../../src/shared/DiamondTypes.sol";
 import { LotteryIntegrationSetup } from "./LotteryIntegrationSetup.sol";
@@ -166,9 +170,16 @@ abstract contract FiddySetup is LotteryIntegrationSetup {
         positions.mint(bob, 2);
         operators.mint(alice, 1);
         operators.mint(bob, 2);
-        FacetCut[] memory cuts = new FacetCut[](2);
+        FacetCut[] memory cuts = new FacetCut[](4);
         cuts[0] = _cut(address(new FiddyTokenFacet()), FiddySelectors.token());
         cuts[1] = _cut(address(new FiddyViewFacet()), FiddySelectors.views());
+        bytes4[] memory purchaseSelectors = new bytes4[](2);
+        purchaseSelectors[0] = ILottery.openRoundForPosition.selector;
+        purchaseSelectors[1] = ILottery.buyTicketsForPosition.selector;
+        cuts[2] = _cut(address(new LotteryFacet()), purchaseSelectors);
+        bytes4[] memory configSelectors = new bytes4[](1);
+        configSelectors[0] = IGovernance.createRewardLotteryConfig.selector;
+        cuts[3] = _cut(address(new GovernanceFacet()), configSelectors);
         vm.prank(authority);
         IDiamondCut(address(diamond)).diamondCut(cuts, address(0), "");
         fiddy = FiddyTokenFacet(address(diamond));
