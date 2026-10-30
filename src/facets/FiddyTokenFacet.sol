@@ -8,6 +8,7 @@ import {
     IERC20Metadata
 } from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import { LibFiddyStorage } from "../libraries/LibFiddyStorage.sol";
+import { LibFiddyMovement } from "../libraries/LibFiddyMovement.sol";
 import { LibFiddy } from "../libraries/LibFiddy.sol";
 import { LibDiamond } from "../libraries/LibDiamond.sol";
 import { LibReentrancy } from "../libraries/LibReentrancy.sol";
@@ -19,7 +20,6 @@ import { FiddyErrors } from "../shared/FiddyErrors.sol";
 import { Errors } from "../shared/Errors.sol";
 
 contract FiddyTokenFacet is ERC20Upgradeable {
-    bytes32 private constant MOVEMENT = keccak256("statics.lottery.fiddy.movement.v1");
     event FiddyInitialized(
         address underlying, address positionNFT, address operators, address registry
     );
@@ -174,23 +174,18 @@ contract FiddyTokenFacet is ERC20Upgradeable {
     }
 
     function _move(address from, address to, uint256 amount) private {
-        bytes32 slot = MOVEMENT;
-        bytes32 movement = keccak256(abi.encode(from, to, amount));
-        assembly ("memory-safe") { tstore(slot, movement) }
+        LibFiddyMovement.authorize(from, to, amount);
         _transfer(from, to, amount);
     }
 
     function _update(address from, address to, uint256 amount) internal override {
         if (from != address(0) && to != address(0)) {
-            bytes32 slot = MOVEMENT;
-            bytes32 movement;
-            assembly ("memory-safe") { movement := tload(slot) }
-            if (movement == keccak256(abi.encode(from, to, amount))) {
-                assembly ("memory-safe") { tstore(slot, 0) }
-            } else if (
-                from == address(this) || to == address(this)
-                    || (!LibFiddyStorage.state().consumers[from]
-                        && !LibFiddyStorage.state().consumers[to])
+            if (
+                !LibFiddyMovement.consume(from, to, amount)
+                    && (from == address(this)
+                        || to == address(this)
+                        || (!LibFiddyStorage.state().consumers[from]
+                            && !LibFiddyStorage.state().consumers[to]))
             ) {
                 revert FiddyErrors.TransferRestricted();
             }
