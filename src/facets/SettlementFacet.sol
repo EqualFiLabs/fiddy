@@ -102,35 +102,31 @@ contract SettlementFacet is ISettlement {
         view
         returns (SettlementAmounts memory amounts)
     {
-        amounts = _allocateValues(
+        return _allocateValues(
             round.receipts.toUint128(),
             round.config.winnerBps,
             round.config.operatorProtocolBps,
+            LibFiddyStorage.state().rounds[roundId].stakerProtocolBps,
             round.config.finalizerTip
         );
-        uint256 protocolAmount = round.receipts - amounts.winner;
-        amounts.staker = protocolAmount * LibFiddyStorage.state().rounds[roundId].stakerProtocolBps
-            / BPS_DENOMINATOR;
-        uint256 treasuryGross = protocolAmount - amounts.operator - amounts.staker;
-        amounts.finalizer =
-            round.config.finalizerTip < treasuryGross ? round.config.finalizerTip : treasuryGross;
-        amounts.treasury = treasuryGross - amounts.finalizer;
     }
 
     function _allocateValues(
         uint128 gross,
         uint16 winnerBps,
         uint16 operatorProtocolBps,
+        uint16 stakerProtocolBps,
         uint96 finalizerTip
     ) internal pure returns (SettlementAmounts memory amounts) {
         // Reachable receipts are bounded by uint96 ticket price * uint32 ticket count. Config
-        // validation also caps both BPS values at the denominator. Under those invariants every
+        // validation caps winner BPS and the combined Operator/staker BPS at the denominator. Under those invariants every
         // multiplication and subtraction below is safe; the live caller checks the gross cast.
         unchecked {
             amounts.winner = uint256(gross) * winnerBps / BPS_DENOMINATOR;
             uint256 protocolAmount = uint256(gross) - amounts.winner;
             amounts.operator = protocolAmount * operatorProtocolBps / BPS_DENOMINATOR;
-            uint256 treasuryGross = protocolAmount - amounts.operator;
+            amounts.staker = protocolAmount * stakerProtocolBps / BPS_DENOMINATOR;
+            uint256 treasuryGross = protocolAmount - amounts.operator - amounts.staker;
             amounts.finalizer = finalizerTip < treasuryGross ? finalizerTip : treasuryGross;
             amounts.treasury = treasuryGross - amounts.finalizer;
         }

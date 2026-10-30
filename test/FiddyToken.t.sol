@@ -94,4 +94,60 @@ contract FiddyTokenTest is FiddySetup {
         assertEq(fiddy.totalSupply(), 0);
         assertEq(tokenA.balanceOf(bob), 10_000 + amount);
     }
+
+    function testWrapCapacityBoundaryAndLoweredCapNeverIncreaseOnRedemption() public {
+        vm.prank(authority);
+        fiddy.setFiddyConversions(true, false, 100);
+        vm.prank(alice);
+        fiddy.wrapFiddy(1, 100);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.WrapCapacityExceeded.selector);
+        fiddy.wrapFiddy(1, 1);
+        vm.prank(authority);
+        fiddy.setFiddyConversions(true, false, 99);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.WrapCapacityExceeded.selector);
+        fiddy.wrapFiddy(1, 1);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.ConversionDisabled.selector);
+        fiddy.unwrapFiddy(1, 1, alice);
+        vm.prank(authority);
+        fiddy.setFiddyConversions(true, true, 99);
+        vm.prank(alice);
+        fiddy.unwrapFiddy(1, 50, alice);
+        vm.prank(alice);
+        fiddy.wrapFiddy(1, 49);
+        (,,,,, uint256 cap, uint256 outstanding) = fiddyView.fiddyReserve();
+        assertEq(cap, 99);
+        assertEq(outstanding, 99);
+    }
+
+    function testDepositAllowanceAndRawCustodyRestrictionSurviveConsumerApproval() public {
+        _wrap(1, alice, 100);
+        vm.prank(alice);
+        fiddy.withdrawFiddy(1, 100, alice);
+        vm.prank(authority);
+        fiddy.setFiddyConsumer(alice, true);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.TransferRestricted.selector);
+        fiddy.transfer(address(diamond), 1);
+        vm.prank(alice);
+        vm.expectRevert();
+        fiddy.depositFiddy(1, 1);
+        assertEq(fiddyView.fiddyAccount(1).balance, 0);
+        vm.prank(authority);
+        fiddy.setFiddyConsumer(alice, false);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.TransferRestricted.selector);
+        fiddy.transfer(bob, 1);
+        vm.prank(alice);
+        fiddy.approve(address(diamond), 1);
+        vm.prank(alice);
+        fiddy.depositFiddy(1, 1);
+        vm.prank(alice);
+        vm.expectRevert();
+        fiddy.depositFiddy(1, 1);
+        assertEq(fiddyView.fiddyAccount(1).balance, 1);
+        assertEq(fiddy.balanceOf(alice), 99);
+    }
 }

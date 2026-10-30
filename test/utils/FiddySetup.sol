@@ -189,12 +189,16 @@ abstract contract FiddySetup is LotteryIntegrationSetup {
         fiddy = FiddyTokenFacet(address(diamond));
         fiddyView = FiddyViewFacet(address(diamond));
         positions.setModule(address(diamond));
+        _initializeFiddy();
+        vm.prank(alice);
+        tokenA.approve(address(diamond), type(uint256).max);
+    }
+
+    function _initializeFiddy() internal virtual {
         vm.prank(authority);
         fiddy.initializeFiddy(
             address(tokenA), address(positions), address(operators), address(operators)
         );
-        vm.prank(alice);
-        tokenA.approve(address(diamond), type(uint256).max);
     }
 
     function _wrap(uint256 id, address owner, uint256 amount) internal {

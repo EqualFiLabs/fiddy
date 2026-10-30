@@ -64,4 +64,46 @@ contract FiddyParticipationTest is FiddySetup {
         assertEq(stateView.latestRoundId(), 0);
         assertEq(fiddy.totalSupply(), 0);
     }
+
+    function testRewardSettingsAreAtomicDisabledAndCannotOversubscribeProtocolShare() public {
+        vm.startPrank(authority);
+        vm.expectRevert(FiddyErrors.InvalidRewardsConfig.selector);
+        governance.createRewardLotteryConfig(
+            _config(address(tokenB), 20, 5, 5, 2 days, 0), FiddyConfig(1, 5001, true)
+        );
+        vm.expectRevert(FiddyErrors.InvalidRewardsConfig.selector);
+        governance.createRewardLotteryConfig(
+            _config(address(tokenB), 20, 5, 5, 2 days, 0), FiddyConfig(1, 0, false)
+        );
+        uint64 version = governance.createRewardLotteryConfig(
+            _config(address(tokenB), 20, 5, 5, 2 days, 0), FiddyConfig(1, 5000, true)
+        );
+        vm.stopPrank();
+        vm.prank(alice);
+        vm.expectRevert();
+        lottery.openRoundForPosition(version, 1, 1);
+        assertEq(fiddyView.fiddyConfig(version).stakerProtocolBps, 5000);
+        assertEq(stateView.latestLotteryConfigVersion(), version);
+    }
+
+    function testParticipationRedemptionDoesNotRaisePublicWrapCap() public {
+        uint64 version = _rewardConfig();
+        vm.prank(alice);
+        fiddy.fundFiddyReserve(10);
+        vm.prank(authority);
+        fiddy.setFiddyConversions(true, true, 5);
+        vm.prank(alice);
+        fiddy.wrapFiddy(1, 5);
+        vm.prank(alice);
+        lottery.openRoundForPosition(version, 1, 1);
+        vm.prank(alice);
+        fiddy.unwrapFiddy(1, 10, alice);
+        (uint256 inventory, uint256 backing,,,, uint256 cap, uint256 outstanding) =
+            fiddyView.fiddyReserve();
+        assertEq(inventory, 0);
+        assertEq(backing, 5);
+        assertEq(cap, 5);
+        assertEq(outstanding, 0);
+        assertEq(fiddy.totalSupply(), 5);
+    }
 }

@@ -94,3 +94,46 @@ remain those of the base Lottery. Existing source licensing is unchanged.
 Actual-candidate local integration and block-pinned fork evidence are separate
 from deployment. This extension authorizes no live transactions or conversion
 activation. Historical formal reports do not prove the new system.
+
+## Client and deployment preparation
+
+Install token, staking and view selector groups together with the updated purchase, governance,
+settlement and surplus facets. Existing round and configuration layouts are unchanged; reward
+extensions use a separate namespace and default to zero for existing rounds. The deployment script
+installs these selectors but leaves FIDDY uninitialized until governance supplies verified bindings
+through `initializeFiddy(STATICS, PositionNFT, Operators, activationRegistry)`. This is one-time.
+No reward configuration is enabled by this initialization. Both conversions, wrap capacity, boosts
+and external consumer approval launch at zero/false.
+
+Before enabling boosts, qualify both history coverage records and the registry's actual consumer
+handoff. Continuous recording after that handoff is an integration trust assumption. Missing history
+cannot be reconstructed by this module. Do not enable against unqualified or interrupted history.
+
+Clients read `fiddyReserve`, `fiddyAccount`, `fiddyOperatorAccount`, `fiddyAsset`, `fiddyCredit`,
+`indexedFiddyRevenue`, `fiddyProcessing`, `fiddyBatch` and paginated `fiddyRevenueAssets` separately.
+Account balance includes raw stake; available FIDDY is balance minus stake. Pending batch revenue
+is not an indexed claim. Show checkpoint revision/cursor and processing progress before proposing
+stake or registration changes. Anyone may process up to 100 units or checkpoint up to 100 assets
+per call. Continue until transfers and earlier funded batches are drained, then checkpoint the
+selected account through every asset at the current revision. An index update invalidates that
+completion. Claims remain available during catch-up and pause.
+
+`registerFiddyOperator` also switches or explicitly refreshes a registration. Activation alone does
+not increase Fiddy weight. Statics link/unlink has no Fiddy weight effect. Account cleanup is also
+paginated and can detach only an empty account after whole claims have been paid.
+
+Run the independent pinned Statics build before Fiddy tests, then the ABI parity check:
+
+```sh
+bash script/build-legacy-baseline.sh
+forge build --config-path integration/foundry.toml
+forge build
+python3 script/check-statics-abi.py
+forge test --match-path 'test/Fiddy*.t.sol'
+```
+
+The Statics fixture uses its compiler/EVM/optimizer settings and local launch funding. Fiddy tests
+deploy its resulting artifacts with their actual bytecode. These local fixtures are distinct from
+block-pinned live dependency qualification. Neither executes a deployment transaction.
+
+Fork qualification uses Robinhood L2 block 101439372, hash `0x81582e4e3659a1e4ad74399fc8ea090acfe2878468029d7dedf3f54e5ec988f4`. Its `NUMBER` opcode returns L1 block 26303058. The test performs only local fork impersonation and candidate creation; it does not broadcast. Runtime code hashes are checked against the pinned deployment manifest before the registry handoff.

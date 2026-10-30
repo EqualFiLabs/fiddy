@@ -4,7 +4,7 @@ import { FiddySetup } from "./utils/FiddySetup.sol";
 import { FiddyConfig } from "../src/shared/FiddyTypes.sol";
 import { FiddyErrors } from "../src/shared/FiddyErrors.sol";
 
-contract FiddyStakingTest is FiddySetup {
+abstract contract FiddyRevenueSetup is FiddySetup {
     function _start() internal {
         _wrap(1, alice, 100);
         _wrap(2, bob, 100);
@@ -38,7 +38,9 @@ contract FiddyStakingTest is FiddySetup {
     function _checkpoint(uint256 id) internal {
         staking.checkpointFiddyAccount(id, 100);
     }
+}
 
+contract FiddyStakingTest is FiddyRevenueSetup {
     function testFundedBoundariesRetainPriorBoostAndInvalidateRoundTrip() public {
         _start();
         _settle(address(tokenB), false); // 100 staker units; 125:100 weights
@@ -147,5 +149,55 @@ contract FiddyStakingTest is FiddySetup {
         (uint256 amount,) = staking.indexedFiddyRevenue(1, address(tokenB));
         assertEq(amount, 0);
         assertEq(stateView.assetAccounting(address(tokenB)).treasuryAvailable, 100);
+    }
+
+    function testApprovalDoesNotGrantFinancialAuthority() public {
+        _wrap(1, alice, 100);
+        vm.prank(alice);
+        positions.approve(bob, 1);
+        vm.prank(bob);
+        vm.expectRevert(FiddyErrors.NotPositionOwner.selector);
+        staking.stakeFiddy(1, 100);
+        vm.prank(bob);
+        vm.expectRevert(FiddyErrors.NotPositionOwner.selector);
+        fiddy.withdrawFiddy(1, 100, bob);
+    }
+
+    function testPartialCleanupReuseCannotDiscardNewWholeEntitlement() public {
+        _start();
+        _settle(address(tokenA), false);
+        _settle(address(tokenB), false);
+        staking.processFiddyRevenue(100);
+        _checkpoint(1);
+        vm.prank(alice);
+        staking.unstakeFiddy(1, 100);
+        vm.prank(alice);
+        fiddy.withdrawFiddy(1, 100, alice);
+        vm.prank(alice);
+        staking.claimFiddyRevenue(1, address(tokenA), alice);
+        vm.prank(alice);
+        staking.claimFiddyRevenue(1, address(tokenB), alice);
+        vm.prank(alice);
+        assertFalse(staking.cleanupFiddyAccount(1, 1));
+        vm.startPrank(alice);
+        fiddy.approve(address(diamond), 5);
+        fiddy.depositFiddy(1, 5);
+        assertEq(fiddyView.fiddyAccount(1).cleanupCursor, 0);
+        staking.stakeFiddy(1, 5);
+        vm.stopPrank();
+        _settle(address(tokenA), false);
+        staking.processFiddyRevenue(100);
+        _checkpoint(1);
+        vm.prank(alice);
+        staking.unstakeFiddy(1, 5);
+        vm.prank(alice);
+        fiddy.withdrawFiddy(1, 5, alice);
+        vm.prank(alice);
+        vm.expectRevert(FiddyErrors.AccountNotEmpty.selector);
+        staking.cleanupFiddyAccount(1, 100);
+        vm.prank(alice);
+        assertGt(staking.claimFiddyRevenue(1, address(tokenA), alice), 0);
+        vm.prank(alice);
+        assertTrue(staking.cleanupFiddyAccount(1, 100));
     }
 }
