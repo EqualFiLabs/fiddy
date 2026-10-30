@@ -4,6 +4,8 @@ pragma solidity 0.8.30;
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
+import { IFiddyProtocol } from "../interfaces/IFiddyProtocol.sol";
+
 import { Errors } from "../shared/Errors.sol";
 
 library LibExactToken {
@@ -14,7 +16,11 @@ library LibExactToken {
         uint256 senderBefore = token.balanceOf(sender);
         uint256 receiverBefore = token.balanceOf(address(this));
 
-        token.safeTransferFrom(sender, address(this), amount);
+        if (asset == address(this)) {
+            IFiddyProtocol(address(this)).protocolMoveFiddy(sender, address(this), amount);
+        } else {
+            token.safeTransferFrom(sender, address(this), amount);
+        }
 
         uint256 senderAfter = token.balanceOf(sender);
         uint256 receiverAfter = token.balanceOf(address(this));
@@ -30,7 +36,11 @@ library LibExactToken {
         uint256 senderBefore = token.balanceOf(address(this));
         uint256 receiverBefore = token.balanceOf(receiver);
 
-        token.safeTransfer(receiver, amount);
+        if (asset == address(this)) {
+            IFiddyProtocol(address(this)).protocolMoveFiddy(address(this), receiver, amount);
+        } else {
+            token.safeTransfer(receiver, amount);
+        }
 
         uint256 senderAfter = token.balanceOf(address(this));
         uint256 receiverAfter = token.balanceOf(receiver);
