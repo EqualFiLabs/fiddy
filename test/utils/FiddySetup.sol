@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { ERC721 } from "openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
 import { IStaticsExternalModules } from "../../src/interfaces/IStaticsExternalModules.sol";
+import { FiddyStakingFacet } from "../../src/facets/FiddyStakingFacet.sol";
 import { FiddyTokenFacet } from "../../src/facets/FiddyTokenFacet.sol";
 import { FiddyViewFacet } from "../../src/facets/FiddyViewFacet.sol";
 import { FiddySelectors } from "../../src/libraries/FiddySelectors.sol";
@@ -159,6 +160,7 @@ contract FiddyOperators is ERC721 {
 abstract contract FiddySetup is LotteryIntegrationSetup {
     FiddyPositions internal positions;
     FiddyOperators internal operators;
+    FiddyStakingFacet internal staking;
     FiddyTokenFacet internal fiddy;
     FiddyViewFacet internal fiddyView;
 
@@ -170,7 +172,7 @@ abstract contract FiddySetup is LotteryIntegrationSetup {
         positions.mint(bob, 2);
         operators.mint(alice, 1);
         operators.mint(bob, 2);
-        FacetCut[] memory cuts = new FacetCut[](4);
+        FacetCut[] memory cuts = new FacetCut[](5);
         cuts[0] = _cut(address(new FiddyTokenFacet()), FiddySelectors.token());
         cuts[1] = _cut(address(new FiddyViewFacet()), FiddySelectors.views());
         bytes4[] memory purchaseSelectors = new bytes4[](2);
@@ -180,8 +182,10 @@ abstract contract FiddySetup is LotteryIntegrationSetup {
         bytes4[] memory configSelectors = new bytes4[](1);
         configSelectors[0] = IGovernance.createRewardLotteryConfig.selector;
         cuts[3] = _cut(address(new GovernanceFacet()), configSelectors);
+        cuts[4] = _cut(address(new FiddyStakingFacet()), FiddySelectors.staking());
         vm.prank(authority);
         IDiamondCut(address(diamond)).diamondCut(cuts, address(0), "");
+        staking = FiddyStakingFacet(address(diamond));
         fiddy = FiddyTokenFacet(address(diamond));
         fiddyView = FiddyViewFacet(address(diamond));
         positions.setModule(address(diamond));

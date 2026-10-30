@@ -3,6 +3,7 @@ pragma solidity 0.8.30;
 
 import { IERC20 } from "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import { FiddyTokenFacet } from "../facets/FiddyTokenFacet.sol";
+import { FiddyStakingFacet } from "../facets/FiddyStakingFacet.sol";
 import { FiddyViewFacet } from "../facets/FiddyViewFacet.sol";
 
 library FiddySelectors {
@@ -28,6 +29,20 @@ library FiddySelectors {
         s[17] = FiddyTokenFacet.unwrapFiddy.selector;
         s[18] = FiddyTokenFacet.protocolMintFiddy.selector;
         s[19] = FiddyTokenFacet.protocolMoveFiddy.selector;
+    }
+
+    function staking() internal pure returns (bytes4[] memory s) {
+        s = new bytes4[](10);
+        s[0] = FiddyStakingFacet.setFiddyBoostsEnabled.selector;
+        s[1] = FiddyStakingFacet.checkpointFiddyAccount.selector;
+        s[2] = FiddyStakingFacet.processFiddyRevenue.selector;
+        s[3] = FiddyStakingFacet.stakeFiddy.selector;
+        s[4] = FiddyStakingFacet.unstakeFiddy.selector;
+        s[5] = FiddyStakingFacet.registerFiddyOperator.selector;
+        s[6] = FiddyStakingFacet.removeFiddyOperator.selector;
+        s[7] = FiddyStakingFacet.claimFiddyRevenue.selector;
+        s[8] = FiddyStakingFacet.cleanupFiddyAccount.selector;
+        s[9] = FiddyStakingFacet.indexedFiddyRevenue.selector;
     }
 
     function views() internal pure returns (bytes4[] memory s) {

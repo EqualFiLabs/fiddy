@@ -47,6 +47,7 @@ library LibFiddy {
         attach(id);
         LibFiddyStorage.State storage s = LibFiddyStorage.state();
         s.accounts[id].balance += amount;
+        s.accounts[id].cleanupCursor = 0;
         s.custodyTotal += amount;
     }
 

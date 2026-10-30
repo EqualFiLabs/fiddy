@@ -5,6 +5,8 @@ import { SafeCast } from "openzeppelin-contracts/contracts/utils/math/SafeCast.s
 
 import { IEqualFiDrandRegistry } from "../interfaces/IEqualFiDrandRegistry.sol";
 import { ISettlement } from "../interfaces/ISettlement.sol";
+import { LibFiddy } from "../libraries/LibFiddy.sol";
+import { LibFiddyStorage } from "../libraries/LibFiddyStorage.sol";
 import { LibLotteryStorage } from "../libraries/LibLotteryStorage.sol";
 import { LibReentrancy } from "../libraries/LibReentrancy.sol";
 import { LibTicketRanges } from "../libraries/LibTicketRanges.sol";
@@ -21,6 +23,7 @@ contract SettlementFacet is ISettlement {
         uint256 operator;
         uint256 treasury;
         uint256 finalizer;
+        uint256 staker;
     }
 
     modifier nonReentrant() {
@@ -47,8 +50,9 @@ contract SettlementFacet is ISettlement {
         bytes32 applicationSeed = _acquireApplicationSeed(round, roundId, quicknetSignature);
         winningTicket = (uint256(applicationSeed) % round.soldTickets).toUint32();
         winner = LibTicketRanges.ownerOfTicket(gs.entries[roundId], winningTicket);
-        SettlementAmounts memory amounts = _allocate(round);
+        SettlementAmounts memory amounts = _allocate(round, roundId);
 
+        LibFiddy.reserve(roundId, round.config.paymentToken, amounts.staker);
         _recordSettlement(gs, round, winningTicket, winner, applicationSeed, amounts);
 
         emit RoundSettled(
@@ -93,17 +97,24 @@ contract SettlementFacet is ISettlement {
         );
     }
 
-    function _allocate(Round storage round)
+    function _allocate(Round storage round, uint256 roundId)
         private
         view
         returns (SettlementAmounts memory amounts)
     {
-        return _allocateValues(
+        amounts = _allocateValues(
             round.receipts.toUint128(),
             round.config.winnerBps,
             round.config.operatorProtocolBps,
             round.config.finalizerTip
         );
+        uint256 protocolAmount = round.receipts - amounts.winner;
+        amounts.staker = protocolAmount * LibFiddyStorage.state().rounds[roundId].stakerProtocolBps
+            / BPS_DENOMINATOR;
+        uint256 treasuryGross = protocolAmount - amounts.operator - amounts.staker;
+        amounts.finalizer =
+            round.config.finalizerTip < treasuryGross ? round.config.finalizerTip : treasuryGross;
+        amounts.treasury = treasuryGross - amounts.finalizer;
     }
 
     function _allocateValues(
