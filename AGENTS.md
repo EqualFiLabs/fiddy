@@ -15,10 +15,11 @@
   not duplicate BLS or drand verification inside the Lottery.
 - `OperatorFeeRouter` is the external Operator-allocation boundary. The Lottery
   accounts for and forwards the configured Operator share; it does not maintain
-  per-Operator ownership, multiplier, reward-index, or claim state.
-- The Lottery must not depend on or modify the Statics Diamond. Treat STATICS as
-  one possible configured ERC-20 Payment Token unless the user explicitly
-  expands the integration scope.
+  the Router's per-Operator ownership, reward-index, or claim state. FIDDY staking
+  registrations are a separate PositionNFT account concern.
+- The Lottery consumes the generic Statics external-account lifecycle and ordered
+  NFT transfer history. Custody, FIDDY backing, staking and revenue stay in the
+  Lottery. Do not add product callbacks or modify finalized launch dependencies.
 - Do not modify sibling repositories or external deployments unless the user
   explicitly expands the scope. Inspect their live source and manifests when
   validating an integration assumption.
