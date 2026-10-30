@@ -45,6 +45,9 @@ accounted(asset) =
   + finalizerLiability
   + pendingOperatorRevenueTotal
   + treasuryAvailable
+  + fiddyRevenueReserved(asset)
+  + (asset == STATICS ? fiddyBacking : 0)
+  + (asset == Diamond ? fiddyInventory + fiddyAccountCustody : 0)
 ```
 
 For a compatible canonical token, the solvency condition is:
@@ -224,3 +227,32 @@ Proof scope and exclusions are described in the
 generated proof results are retained privately.
 
 The historical lifecycle and original proof report do not establish the deadline-draw candidate. New live testnet execution remains pending; candidate formal evidence is recorded separately.
+
+## FIDDY accounting
+
+FIDDY supply equals allocated STATICS backing, including preminted reward inventory.
+Prefunding pulls exact STATICS, allocates backing and mints matching FIDDY into inventory.
+Participation moves existing FIDDY from inventory to account custody without changing supply
+or backing. Inventory is a subset of supply, not additional STATICS liability. Public
+wrap moves exact STATICS into backing and creates account custody; unwrap burns unstaked account
+FIDDY and releases exact STATICS. External transfers change neither backing nor supply. Total
+account balances (including stake) equal `fiddyAccountCustody`; stake is not counted a second time.
+
+Settlement reserves staker revenue before removing round escrow. The reserve includes pending
+FIFO batches and indexed claims exactly once: indexing reduces pending, not reserved. Claims
+reduce reserved. Zero-weight batches and whole rounding dust reduce reserved and increase Treasury.
+Each account retains fractional entitlement while active. Explicit empty-account cleanup surrenders
+only fractions below one base unit. Historical fractions and index dust never enter a later index.
+
+Winner = floor(receipts * winnerBps / 10000). Operator and staker amounts are independently floored
+fractions of the protocol remainder. Treasury receives the rest less the capped finalizer tip.
+The Operator and staker percentages sum to at most 10000. Old rounds have zero staker share.
+
+For a FIDDY payment round, account withdrawal, ticket escrow and all claims move existing supply;
+reward inventory and account custody are counted alongside ordinary Lottery liabilities.
+STATICS liabilities count allocated backing once, without adding inventory again. Exact Router funding uses
+a single-use protocol movement and clears its allowance. Approved consumer status never permits
+raw transfers into protocol custody or redemption.
+
+Historical formal reports do not cover FIDDY. Current evidence consists of focused tests, stateful
+conservation, actual-candidate integration, and separately reported fork qualification.

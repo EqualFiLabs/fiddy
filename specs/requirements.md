@@ -426,7 +426,7 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 
 1. THE Lottery SHALL delegate Quicknet proof verification and beacon caching to `EqualFiDrandRegistry`.
 2. THE Lottery SHALL delegate Statics Operator reward distribution to `OperatorFeeRouter`.
-3. THE Lottery SHALL NOT depend on the Statics Diamond for lottery operation.
+3. Reward-enabled operation SHALL use only the generic Statics external-account lifecycle and ordered transfer-history interface; product custody and accounting remain in the Lottery.
 4. THE Lottery SHALL NOT maintain its own copy of Statics Operator ownership or activation-weight accounting.
 5. THE Lottery SHALL NOT maintain its own BLS12-381 verification implementation.
 6. A failure in Operator reward ingress SHALL NOT block the lottery lifecycle.
@@ -514,3 +514,19 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 - Existing Round configuration cannot be changed retroactively.
 - All tunable economic and operational values are governance-configurable for future Rounds.
 - The immutable drand Registry is a release-critical formal-verification target with an explicit trusted computing base and no unresolved required proof results.
+
+
+### Requirement 26: Backed FIDDY and PositionNFT revenue staking
+
+The normative FIDDY specification is [FIDDY rewards](../docs/fiddy-rewards.md).
+
+1. Every FIDDY unit SHALL have one allocated STATICS unit of backing. Reserve funding SHALL immediately mint backed FIDDY into reward inventory. Inventory is part of supply and its STATICS backing SHALL NOT be counted twice. Participation SHALL distribute existing inventory without minting or changing backing; inventory, account custody and Payment Token liabilities remain separately accounted.
+2. Participation issuance SHALL be capped by funded inventory, attributed to an explicitly selected owned PositionNFT, and independent of ticket and winner rights.
+3. FIDDY transfers SHALL require an approved consumer endpoint or an exact authorized protocol movement. Approvals alone never bypass this restriction.
+4. Public wrap and unwrap SHALL launch independently disabled with zero public wrap capacity. Only a separately enabled unwrap burns FIDDY and releases matching STATICS.
+5. Future immutable configurations SHALL snapshot reward rates and staker protocol shares without enlarging existing embedded round storage.
+6. Settlement SHALL reserve actual staker fees per asset and their original transfer-sequence boundary without processing a backlog.
+7. Permissionless bounded processing SHALL reconcile transfers and all affected asset checkpoints before indexing revenue. All earlier funding and current checkpoints must precede denominator changes.
+8. Operator boosts SHALL use unique per-module registrations, direct activation reads and prospective explicit refresh, independent of Statics links. Either NFT's ownership-changing transfer invalidates its boost.
+9. Current PositionNFT ownership SHALL control account actions and legitimate historical rewards. Occupied accounts SHALL retain closure protection.
+10. Zero-weight revenue and rounding dust SHALL never be captured by future entrants. Inventory, backing, account custody and pending/indexed fees SHALL be protected from surplus absorption.

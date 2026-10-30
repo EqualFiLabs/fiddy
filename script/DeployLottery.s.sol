@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity 0.8.30;
 
+import { FiddyTokenFacet } from "../src/facets/FiddyTokenFacet.sol";
+import { FiddyStakingFacet } from "../src/facets/FiddyStakingFacet.sol";
+import { FiddyViewFacet } from "../src/facets/FiddyViewFacet.sol";
+import { FiddySelectors } from "../src/libraries/FiddySelectors.sol";
 import { Script } from "forge-std/Script.sol";
 
 import { StaticsLotteryDiamond } from "../src/StaticsLotteryDiamond.sol";
@@ -75,6 +79,9 @@ contract DeployLottery is Script {
         address revenueFacet;
         address viewFacet;
         address initializer;
+        address fiddyTokenFacet;
+        address fiddyStakingFacet;
+        address fiddyViewFacet;
     }
 
     error DependencyCodeHashMismatch(address dependency, bytes32 expected, bytes32 actual);
@@ -112,6 +119,9 @@ contract DeployLottery is Script {
         deployment.revenueFacet = address(new RevenueFacet());
         deployment.viewFacet = address(new LotteryViewFacet());
         deployment.initializer = address(new LotteryInit());
+        deployment.fiddyTokenFacet = address(new FiddyTokenFacet());
+        deployment.fiddyStakingFacet = address(new FiddyStakingFacet());
+        deployment.fiddyViewFacet = address(new FiddyViewFacet());
 
         _initializeDiamond(deployment, authority, operatorFeeRouter);
     }
@@ -121,7 +131,7 @@ contract DeployLottery is Script {
         address authority,
         address operatorFeeRouter
     ) internal {
-        FacetCut[] memory cuts = new FacetCut[](7);
+        FacetCut[] memory cuts = new FacetCut[](10);
         cuts[0] = _cut(deployment.loupeFacet, _loupeSelectors());
         cuts[1] = _cut(deployment.governanceFacet, _governanceSelectors());
         cuts[2] = _cut(deployment.lotteryFacet, _lotterySelectors());
@@ -129,6 +139,10 @@ contract DeployLottery is Script {
         cuts[4] = _cut(deployment.claimsFacet, _claimsSelectors());
         cuts[5] = _cut(deployment.revenueFacet, _revenueSelectors());
         cuts[6] = _cut(deployment.viewFacet, _viewSelectors());
+
+        cuts[7] = _cut(deployment.fiddyTokenFacet, FiddySelectors.token());
+        cuts[8] = _cut(deployment.fiddyStakingFacet, FiddySelectors.staking());
+        cuts[9] = _cut(deployment.fiddyViewFacet, FiddySelectors.views());
 
         LotteryConfig[] memory configs = new LotteryConfig[](2);
         configs[0] = _lotteryConfig(WETH, WETH_TICKET_PRICE, WETH_FINALIZER_TIP);
@@ -213,7 +227,7 @@ contract DeployLottery is Script {
     }
 
     function _governanceSelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](13);
+        selectors = new bytes4[](14);
         selectors[0] = IGovernance.createLotteryConfig.selector;
         selectors[1] = IGovernance.setLotteryConfigEnabled.selector;
         selectors[2] = IGovernance.setMaxActiveRounds.selector;
@@ -227,10 +241,13 @@ contract DeployLottery is Script {
         selectors[10] = IGovernance.treasuryRecipient.selector;
         selectors[11] = IGovernance.protocolFinalized.selector;
         selectors[12] = IGovernance.finalizeProtocol.selector;
+        selectors[13] = IGovernance.createRewardLotteryConfig.selector;
     }
 
     function _lotterySelectors() internal pure returns (bytes4[] memory selectors) {
-        selectors = new bytes4[](2);
+        selectors = new bytes4[](4);
+        selectors[2] = ILottery.openRoundForPosition.selector;
+        selectors[3] = ILottery.buyTicketsForPosition.selector;
         selectors[0] = ILottery.openRound.selector;
         selectors[1] = ILottery.buyTickets.selector;
     }

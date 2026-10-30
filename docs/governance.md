@@ -17,7 +17,8 @@ The authority may:
 
 - add, replace, or remove facet selectors before finalization;
 - execute an initializer during a Diamond cut;
-- create immutable Round Configuration Versions;
+- create immutable Round Configuration Versions, including explicit FIDDY reward settings;
+- initialize verified FIDDY bindings once, approve consumers, and control conversions, capacity and boosts;
 - enable or disable versions for future opening;
 - create immutable Integration Versions;
 - set the global active-Round limit;
@@ -188,3 +189,5 @@ exercise the bounded lifecycle. It is explicitly not a production governance con
 ## Deadline-draw release boundary
 
 Sales duration remains a positive configurable `uint32`, including periods longer than 24 hours. Existing Round snapshots cannot be changed by configuration governance. The historical finalized testnet Diamond cannot receive this behavior; deploy a fresh Diamond after separate authorization. Historical refund evidence above describes the old release only.
+
+FIDDY bindings are fixed after initialization. Initialization does not enable conversions, capacity, boosts, consumers or reward configurations. Boost enablement requires ready transfer coverage and the actual canonical registry consumer handoff. Governance must preserve uninterrupted history recording. These configuration controls remain available after Diamond finalization. See [FIDDY rewards](fiddy-rewards.md).
