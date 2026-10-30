@@ -8,7 +8,7 @@ import { FiddyViewFacet } from "../facets/FiddyViewFacet.sol";
 
 library FiddySelectors {
     function token() internal pure returns (bytes4[] memory s) {
-        s = new bytes4[](20);
+        s = new bytes4[](19);
         s[0] = FiddyTokenFacet.name.selector;
         s[1] = FiddyTokenFacet.symbol.selector;
         s[2] = FiddyTokenFacet.decimals.selector;
@@ -27,8 +27,7 @@ library FiddySelectors {
         s[15] = FiddyTokenFacet.withdrawFiddy.selector;
         s[16] = FiddyTokenFacet.wrapFiddy.selector;
         s[17] = FiddyTokenFacet.unwrapFiddy.selector;
-        s[18] = FiddyTokenFacet.protocolMintFiddy.selector;
-        s[19] = FiddyTokenFacet.protocolMoveFiddy.selector;
+        s[18] = FiddyTokenFacet.protocolMoveFiddy.selector;
     }
 
     function staking() internal pure returns (bytes4[] memory s) {

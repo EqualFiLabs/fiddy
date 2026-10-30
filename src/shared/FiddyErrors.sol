@@ -20,5 +20,4 @@ library FiddyErrors {
     error OperatorAlreadyRegistered();
     error HistoryUnavailable();
     error AccountNotEmpty();
-    error InvalidBacking();
 }

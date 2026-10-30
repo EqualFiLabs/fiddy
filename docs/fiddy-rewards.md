@@ -3,10 +3,12 @@
 ## Token and custody
 
 FIDDY is the Lottery Diamond's restricted ERC-20, backed one-for-one in STATICS
-base units. Exact STATICS funding credits unallocated inventory. Issuance moves
-inventory into allocated backing and mints the same FIDDY to protocol custody,
-credited to a canonical PositionNFT account. Inventory exhaustion issues only
-available units, reports the shortfall and creates no debt.
+base units. Following Burntato's reserve model, exact STATICS funding immediately
+allocates backing and mints matching FIDDY into protocol reward inventory. Participation
+credits those existing FIDDY units to a canonical PositionNFT account, reducing inventory
+without changing supply, backing or the Diamond's ERC-20 balance. Inventory exhaustion
+credits only available units, reports the shortfall and creates no debt. Reserve funding
+remains available with public conversions disabled and grants the funder no withdrawal right.
 
 Ordinary transfers require either endpoint to be an explicitly approved consumer.
 There is no implicit governance exemption. Exact protocol movements handle account

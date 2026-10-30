@@ -1610,3 +1610,7 @@ registration, ordered processing, storage and API behavior. It extends the base
 allocation formula with a staker percentage of protocol receipts before the
 Treasury-funded finalizer tip. A missing extension means zero participation
 issuance and zero staker allocation; existing round structures are unchanged.
+Reserve funding follows Burntato: deposit exact STATICS and mint matching FIDDY
+into reward inventory immediately. Participation only credits existing inventory
+to accounts. Public wrap/unwrap remain independently disabled at launch; funding
+reward inventory does not enable public conversion or create funder redemption rights.

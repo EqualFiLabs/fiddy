@@ -108,7 +108,9 @@ contract FiddyTokenFacet is ERC20Upgradeable {
         _positive(amount);
         LibFiddyStorage.State storage s = LibFiddyStorage.state();
         s.inventory += amount;
+        s.allocatedBacking += amount;
         LibExactToken.pullExact(s.underlying, msg.sender, amount);
+        _mint(address(this), amount);
         emit FiddyReserveFunded(msg.sender, amount);
     }
 
@@ -159,13 +161,6 @@ contract FiddyTokenFacet is ERC20Upgradeable {
         _burn(address(this), amount);
         LibExactToken.pushExact(s.underlying, receiver, amount);
         emit FiddyUnwrapped(id, receiver, amount);
-    }
-
-    function protocolMintFiddy(uint256 amount) external onlyProtocol {
-        if (LibFiddyStorage.state().allocatedBacking != totalSupply() + amount) {
-            revert FiddyErrors.InvalidBacking();
-        }
-        _mint(address(this), amount);
     }
 
     function protocolMoveFiddy(address from, address to, uint256 amount) external onlyProtocol {

@@ -7,3 +7,5 @@
 5. Qualify real shared integration, storage upgrades, adversarial assets and economic conservation; commit the candidate, review locally, remediate and open one feature PR with terminal CI evidence.
 
 No chain deployment, public conversion activation, AMM construction or sibling-repository modification is included. Existing historical proof results do not cover this extension.
+
+- [x] Mint fully backed FIDDY reward inventory at reserve funding, distribute existing units for participation, and protect inventory from surplus without double-counting STATICS backing.

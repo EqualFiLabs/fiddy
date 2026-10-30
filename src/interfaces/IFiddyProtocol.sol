@@ -2,7 +2,6 @@
 pragma solidity 0.8.30;
 
 interface IFiddyProtocol {
-    function protocolMintFiddy(uint256 amount) external;
     function protocolMoveFiddy(address from, address to, uint256 amount) external;
 }
 

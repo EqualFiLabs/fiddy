@@ -22,8 +22,8 @@ library LibFiddyStorage {
         bool boostsEnabled;
         uint256 wrapCap;
         uint256 wrapOutstanding;
-        uint256 inventory;
-        uint256 allocatedBacking;
+        uint256 inventory; // Preminted FIDDY available for participation rewards.
+        uint256 allocatedBacking; // STATICS backing all supply, including inventory.
         uint256 custodyTotal;
         uint256 totalWeight;
         uint256 revision;

@@ -18,9 +18,16 @@ contract FiddyParticipationTest is FiddySetup {
         uint64 version = _rewardConfig();
         vm.prank(alice);
         fiddy.fundFiddyReserve(25);
+        assertEq(fiddy.totalSupply(), 25);
+        assertEq(fiddy.balanceOf(address(diamond)), 25);
         vm.prank(alice);
         uint256 roundId = lottery.openRoundForPosition(version, 2, 1);
         assertEq(fiddyView.fiddyAccount(1).balance, 20);
+        assertEq(fiddy.totalSupply(), 25);
+        (uint256 inventory, uint256 backing, uint256 custody,,,,) = fiddyView.fiddyReserve();
+        assertEq(inventory, 5);
+        assertEq(backing, 25);
+        assertEq(custody, 20);
         vm.prank(bob);
         lottery.buyTicketsForPosition(roundId, 3, 2);
         assertEq(fiddyView.fiddyAccount(2).balance, 5);
@@ -62,7 +69,11 @@ contract FiddyParticipationTest is FiddySetup {
         lottery.openRoundForPosition(version, 1, 1);
         assertEq(tokenB.balanceOf(alice), before);
         assertEq(stateView.latestRoundId(), 0);
-        assertEq(fiddy.totalSupply(), 0);
+        assertEq(fiddy.totalSupply(), 100);
+        (uint256 inventory, uint256 backing, uint256 custody,,,,) = fiddyView.fiddyReserve();
+        assertEq(inventory, 100);
+        assertEq(backing, 100);
+        assertEq(custody, 0);
     }
 
     function testRewardSettingsAreAtomicDisabledAndCannotOversubscribeProtocolShare() public {

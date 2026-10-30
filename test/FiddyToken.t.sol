@@ -7,14 +7,43 @@ contract FiddyTokenTest is FiddySetup {
     function testLaunchConversionsDisabledAndFundingIsReservedFromSurplus() public {
         vm.prank(alice);
         fiddy.fundFiddyReserve(100);
-        assertEq(fiddy.totalSupply(), 0);
+        assertEq(fiddy.totalSupply(), 100);
+        assertEq(fiddy.balanceOf(address(diamond)), 100);
+        (uint256 inventory, uint256 backing, uint256 custody,,,, uint256 outstanding) =
+            fiddyView.fiddyReserve();
+        assertEq(inventory, 100);
+        assertEq(backing, 100);
+        assertEq(custody, 0);
+        assertEq(outstanding, 0);
         assertEq(revenue.availableTokenSurplus(address(tokenA)), 0);
         vm.startPrank(alice);
+        vm.expectRevert(FiddyErrors.InsufficientFiddy.selector);
+        fiddy.withdrawFiddy(1, 100, alice);
         vm.expectRevert(FiddyErrors.ConversionDisabled.selector);
         fiddy.wrapFiddy(1, 1);
         vm.expectRevert(FiddyErrors.ConversionDisabled.selector);
         fiddy.unwrapFiddy(1, 1, alice);
         vm.stopPrank();
+    }
+
+    function testInventoryRemainsBackedWhileAccountWrapIsRedeemed() public {
+        vm.prank(alice);
+        fiddy.fundFiddyReserve(100);
+        _wrap(1, alice, 40);
+        vm.prank(authority);
+        fiddy.setFiddyConversions(false, true, 0);
+        vm.prank(alice);
+        fiddy.unwrapFiddy(1, 40, alice);
+        (uint256 inventory, uint256 backing, uint256 custody,,,, uint256 outstanding) =
+            fiddyView.fiddyReserve();
+        assertEq(inventory, 100);
+        assertEq(backing, 100);
+        assertEq(custody, 0);
+        assertEq(outstanding, 0);
+        assertEq(fiddy.totalSupply(), 100);
+        assertEq(fiddy.balanceOf(address(diamond)), 100);
+        assertEq(tokenA.balanceOf(address(diamond)), 100);
+        assertEq(revenue.availableTokenSurplus(address(tokenA)), 0);
     }
 
     function testConsumerRoutesAndAccountOwnershipConserveBacking() public {

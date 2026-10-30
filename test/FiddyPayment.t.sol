@@ -5,6 +5,8 @@ import { FiddyErrors } from "../src/shared/FiddyErrors.sol";
 
 contract FiddyPaymentTest is FiddySetup {
     function testFiddyPaymentOperatorFlushConsumesExactCapability() public {
+        vm.prank(alice);
+        fiddy.fundFiddyReserve(37);
         _wrap(1, alice, 100);
         vm.prank(alice);
         fiddy.withdrawFiddy(1, 100, alice);
@@ -27,6 +29,13 @@ contract FiddyPaymentTest is FiddySetup {
         assertEq(stateView.pendingOperatorRevenue(1, address(diamond)), 0);
         assertEq(router.totalAdded(address(diamond)), 10);
         assertEq(fiddy.allowance(address(diamond), address(router)), 0);
+        assertEq(fiddy.totalSupply(), 137);
+        (uint256 inventory, uint256 backing, uint256 custody,,,,) = fiddyView.fiddyReserve();
+        assertEq(inventory, 37);
+        assertEq(backing, 137);
+        assertEq(custody, 0);
+        assertEq(revenue.availableTokenSurplus(address(diamond)), 0);
+        assertEq(revenue.availableTokenSurplus(address(tokenA)), 0);
         vm.prank(address(router));
         vm.expectRevert(FiddyErrors.TransferRestricted.selector);
         fiddy.transfer(address(diamond), 1);

@@ -41,6 +41,10 @@
 
 ## Protocol Invariants
 
+- FIDDY reserve funding follows Burntato: exact STATICS funding immediately mints
+  matching FIDDY into protocol reward inventory. Ticket participation distributes
+  existing inventory without minting or changing backing. Public wrap and unwrap
+  have independent enable flags and both launch disabled, with zero wrap capacity.
 - Governance creates immutable Round Configuration Versions and controls which
   versions may open future rounds. Opening a round snapshots its configuration,
   including its Payment Token; later governance changes must not mutate an open

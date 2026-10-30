@@ -520,7 +520,7 @@ A settled Round state from which ticket purchases can never resume. The legacy e
 
 The normative FIDDY specification is [FIDDY rewards](../docs/fiddy-rewards.md).
 
-1. Every FIDDY unit SHALL have one allocated STATICS unit of backing. Reward inventory is separate from allocated backing and all Payment Token liabilities.
+1. Every FIDDY unit SHALL have one allocated STATICS unit of backing. Reserve funding SHALL immediately mint backed FIDDY into reward inventory. Inventory is part of supply and its STATICS backing SHALL NOT be counted twice. Participation SHALL distribute existing inventory without minting or changing backing; inventory, account custody and Payment Token liabilities remain separately accounted.
 2. Participation issuance SHALL be capped by funded inventory, attributed to an explicitly selected owned PositionNFT, and independent of ticket and winner rights.
 3. FIDDY transfers SHALL require an approved consumer endpoint or an exact authorized protocol movement. Approvals alone never bypass this restriction.
 4. Public wrap and unwrap SHALL launch independently disabled with zero public wrap capacity. Only a separately enabled unwrap burns FIDDY and releases matching STATICS.

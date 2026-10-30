@@ -46,8 +46,8 @@ accounted(asset) =
   + pendingOperatorRevenueTotal
   + treasuryAvailable
   + fiddyRevenueReserved(asset)
-  + (asset == STATICS ? fiddyInventory + fiddyBacking : 0)
-  + (asset == Diamond ? fiddyAccountCustody : 0)
+  + (asset == STATICS ? fiddyBacking : 0)
+  + (asset == Diamond ? fiddyInventory + fiddyAccountCustody : 0)
 ```
 
 For a compatible canonical token, the solvency condition is:
@@ -230,8 +230,10 @@ The historical lifecycle and original proof report do not establish the deadline
 
 ## FIDDY accounting
 
-FIDDY supply equals allocated STATICS backing. Prefunding increases unallocated inventory;
-participation moves inventory into backing and mints the same amount to account custody. Public
+FIDDY supply equals allocated STATICS backing, including preminted reward inventory.
+Prefunding pulls exact STATICS, allocates backing and mints matching FIDDY into inventory.
+Participation moves existing FIDDY from inventory to account custody without changing supply
+or backing. Inventory is a subset of supply, not additional STATICS liability. Public
 wrap moves exact STATICS into backing and creates account custody; unwrap burns unstaked account
 FIDDY and releases exact STATICS. External transfers change neither backing nor supply. Total
 account balances (including stake) equal `fiddyAccountCustody`; stake is not counted a second time.
@@ -247,7 +249,8 @@ fractions of the protocol remainder. Treasury receives the rest less the capped 
 The Operator and staker percentages sum to at most 10000. Old rounds have zero staker share.
 
 For a FIDDY payment round, account withdrawal, ticket escrow and all claims move existing supply;
-only account custody is counted alongside ordinary Lottery liabilities. Exact Router funding uses
+reward inventory and account custody are counted alongside ordinary Lottery liabilities.
+STATICS liabilities count allocated backing once, without adding inventory again. Exact Router funding uses
 a single-use protocol movement and clears its allowance. Approved consumer status never permits
 raw transfers into protocol custody or redemption.
 

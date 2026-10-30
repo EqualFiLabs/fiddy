@@ -2,7 +2,7 @@
 pragma solidity 0.8.30;
 
 import { IERC721 } from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
-import { IFiddyProtocol, IFiddyActivation } from "../interfaces/IFiddyProtocol.sol";
+import { IFiddyActivation } from "../interfaces/IFiddyProtocol.sol";
 import { IStaticsExternalModules } from "../interfaces/IStaticsExternalModules.sol";
 import { LibFiddyStorage } from "./LibFiddyStorage.sol";
 import { LibLotteryStorage } from "./LibLotteryStorage.sol";
@@ -70,8 +70,6 @@ library LibFiddy {
         if (issued != 0) {
             creditBalance(id, issued);
             s.inventory -= issued;
-            s.allocatedBacking += issued;
-            IFiddyProtocol(address(this)).protocolMintFiddy(issued);
         }
         emit FiddyParticipation(roundId, id, requested, issued, requested - issued);
     }
@@ -89,8 +87,8 @@ library LibFiddy {
     function extraReserved(address asset) internal view returns (uint256 amount) {
         LibFiddyStorage.State storage s = LibFiddyStorage.state();
         amount = s.assets[asset].reserved;
-        if (asset == s.underlying) amount += s.inventory + s.allocatedBacking;
-        if (asset == address(this)) amount += s.custodyTotal;
+        if (asset == s.underlying) amount += s.allocatedBacking;
+        if (asset == address(this)) amount += s.inventory + s.custodyTotal;
     }
 
     function enforceHistory() internal view {
